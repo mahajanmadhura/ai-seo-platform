@@ -1,0 +1,18 @@
+# Environments
+venv/
+env/
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Database (Do not push local test databases!)
+db.sqlite3
+
+# Celery
+celerybeat-schedule
+*.pid
+
+# Logs
+*.log

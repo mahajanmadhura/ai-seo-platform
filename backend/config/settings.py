@@ -81,3 +81,18 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+# ==========================================
+# CELERY & REDIS SETTINGS
+# ==========================================
+# The URL where Redis is running (default local port is 6379)
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+
+# Where Celery should store the results of the tasks once they are done
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+
+# Accept content in JSON format
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
