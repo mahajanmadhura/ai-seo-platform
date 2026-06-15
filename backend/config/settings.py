@@ -15,6 +15,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_celery_results',
+    'channels',
     'rest_framework',
     'accounts',
     'websites',
@@ -89,10 +91,24 @@ REST_FRAMEWORK = {
 CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
 
 # Where Celery should store the results of the tasks once they are done
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND = 'django-db'
 
 # Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+FRONTEND_URL = "http://localhost:3000"
+DOMAIN_NAME = "localhost:8000"
+BREVO_API_KEY = "any-random-string-for-now"
+
+# Channels Configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
