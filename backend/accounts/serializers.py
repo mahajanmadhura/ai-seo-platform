@@ -34,15 +34,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.set_password(password)
 
-        user.is_active = False
-        user.is_verified = False
+        user.is_active = True
+        user.is_verified = True
 
         # Generate token ONLY HERE
         raw_token, hashed_token = generate_token()
 
         user.verification_token = hashed_token
         user.verification_token_expiry = (
-            timezone.now() + timedelta(minutes=10)
+            timezone.now() + timedelta(minutes=15)
         )
 
         user.save()
@@ -66,7 +66,7 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        user = authenticate(email=email, password=password)
+        user = authenticate(username=email, password=password)
 
         if not user:
             raise serializers.ValidationError("Invalid email or password.")

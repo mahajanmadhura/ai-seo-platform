@@ -1,13 +1,29 @@
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env file
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
 
 DEBUG = True
-
 ALLOWED_HOSTS = ['*']
 
+
+# EMAIL / BREVO CONFIG (FINAL)
+
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+DOMAIN_NAME = os.getenv("AI SEO Platform")
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# ==================================
+# APPS
+# ==================================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,41 +74,30 @@ DATABASES = {
     }
 }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
-
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-STATIC_URL = 'static/'
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
 AUTH_USER_MODEL = 'accounts.User'
 
+# ==================================
+# REST FRAMEWORK + JWT
+# ==================================
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    )
 }
 
-# ==========================================
-# CELERY & REDIS SETTINGS
-# ==========================================
-# The URL where Redis is running (default local port is 6379)
+# ==================================
+# CELERY (optional)
+# ==================================
 CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-
-# Where Celery should store the results of the tasks once they are done
 CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
-
-# Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+CELERY_TIMEZONE = 'UTC'
+
+# ==================================
+# STATIC
+# ==================================
+STATIC_URL = 'static/'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
