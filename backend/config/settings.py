@@ -1,10 +1,11 @@
 from pathlib import Path
-
+import os
+from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(dotenv_path=BASE_DIR / '.env')
 SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
 
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['*']
 
@@ -105,9 +106,17 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-FRONTEND_URL = "http://localhost:3000"
+FRONTEND_URL = 'http://localhost:8000/api/auth'
 DOMAIN_NAME = "localhost:8000"
-BREVO_API_KEY = "any-random-string-for-now"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+# Email Configuration for Brevo
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp-relay.brevo.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")  # Your Brevo login email
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")  # SMTP key, not API key
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")  # Must be verified in Brevo
 
 # Channels Configuration
 CHANNEL_LAYERS = {

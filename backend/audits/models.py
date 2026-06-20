@@ -1,7 +1,7 @@
 from django.db import models
 
 class Audit(models.Model):
-    website=models.ForeignKey('websites.Website',on_delete=models.CASCADE)
+    website=models.ForeignKey('websites.Website',on_delete=models.CASCADE)   #after merge fix needed
     status_choices=[
         ("PENDING","⏳ Pending"),
         ("RUNNING","🔄 Running"),
@@ -28,4 +28,12 @@ class CrawledPage(models.Model):
     technical_score=models.IntegerField(null=True)
 
 class SEOIssues(models.Model):
-    ...
+    issue_choices=[
+        ("ERROR","❌ Error"),
+        ("WARNING","⚠️ Warning"),
+        ("NOTICE", "📢 Notice")
+    ]
+    url=models.ForeignKey(CrawledPage,on_delete=models.CASCADE)
+    issue_type=models.CharField(max_length=20,choices=issue_choices)
+    description=models.TextField()
+    is_fixed=models.BooleanField(default=False)
