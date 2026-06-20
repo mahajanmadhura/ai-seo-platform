@@ -14,11 +14,11 @@ def run_seo_audit(audit_id):
     audit_website.save()
     print(f"We are going to audit the website with id {audit_id}")
 
-    status_code,html_text=fetch_url(audit_website.url)
+    status_code,html_text=fetch_url(audit_website.website.url)
     result_of_parse=parse_html(html_text)
 
     CrawledPage.objects.create(audit=audit_website,
-                               url=audit_website.url,
+                               url=audit_website.website.url,
                                status_code=status_code,
                                title=result_of_parse["title"],
                                h1=result_of_parse["h1"],
