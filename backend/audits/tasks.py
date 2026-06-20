@@ -3,27 +3,44 @@ from .models import Audit,CrawledPage
 from .crawler import fetch_url, parse_html
 
 @shared_task
-def your_test_task(a, b):
-    print(f"I am cooking: {a} + {b}")
-    return a+b
-
-@shared_task
 def run_seo_audit(audit_id):
     audit_website=Audit.objects.get(id=audit_id)
     audit_website.status="RUNNING"
     audit_website.save()
     print(f"We are going to audit the website with id {audit_id}")
 
-    status_code,html_text=fetch_url(audit_website.website.url)
-    result_of_parse=parse_html(html_text)
+    urls_to_visit=[audit_website.website.url]
 
-    CrawledPage.objects.create(audit=audit_website,
-                               url=audit_website.website.url,
-                               status_code=status_code,
-                               title=result_of_parse["title"],
-                               h1=result_of_parse["h1"],
-                               word_count=result_of_parse["word_count"],
-                               load_time=0.00)
+    visited_urls=set()
+    while urls_to_visit and len(visited_urls)<=5:
+        current_url=urls_to_visit.pop(0)
+        if current_url in visited_urls:
+            continue
+
+        print(f"Crawling: {current_url}")
+        visited_urls.add(current_url)
+
+        try:
+            status_code,html_text,load_time=fetch_url(current_url)
+            result_of_parse=parse_html(html_text,current_url)
+
+            CrawledPage.objects.create(audit=audit_website,
+                                    url=current_url,
+                                    status_code=status_code,
+                                    title=result_of_parse["title"],
+                                    h1=result_of_parse["h1"],
+                                    meta_description=result_of_parse["meta_description"],
+                                    word_count=result_of_parse["word_count"],
+                                    load_time=load_time)
+            
+            for new_link in result_of_parse["links"]:
+                if new_link not in urls_to_visit:
+                    urls_to_visit.append(new_link)
+        except Exception as e:
+            print(f"Audit failed, Error: {e}")
+
     audit_website.status="DONE"
     audit_website.save()
     return "Audit Complete!"
+
+        
