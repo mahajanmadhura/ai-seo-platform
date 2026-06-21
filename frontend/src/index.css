@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #060909; /* Immersive Dark Evergreen/Charcoal foundation */
+    color: #e2e2e1;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Glassmorphism Styles */
+.glass {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.warm-glass {
+  background: rgba(253, 251, 247, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(253, 251, 247, 0.35);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Micro-interactions & Custom Utilities */
+@keyframes levitate {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-levitate {
+  animation: levitate 6s ease-in-out infinite;
+}
+
+.animate-levitate-delayed {
+  animation: levitate 6s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #060909;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #84FF00;
+}

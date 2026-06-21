@@ -88,8 +88,20 @@ REST_FRAMEWORK = {
 # The URL where Redis is running (default local port is 6379)
 CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
 
+# Force Redis client to use RESP2 (protocol 2) since local Redis server might be older version (e.g. on Windows)
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'client_kwargs': {
+        'protocol': 2
+    }
+}
+
 # Where Celery should store the results of the tasks once they are done
 CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+    'client_kwargs': {
+        'protocol': 2
+    }
+}
 
 # Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
