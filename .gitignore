@@ -1,0 +1,95 @@
+# ==========================================
+# Root GitIgnore for AI SEO Audit Platform
+# ==========================================
+
+# ------------------------------------------
+# Frontend Ignores
+# ------------------------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.cache/
+frontend/coverage/
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# ------------------------------------------
+# Backend Ignores
+# ------------------------------------------
+# Python Cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+
+# Virtual Environments
+venv/
+.venv/
+env/
+backend/venv/
+backend/.venv/
+backend/env/
+
+# Database Files
+backend/db.sqlite3
+backend/db.sqlite
+backend/*.sqlite
+backend/*.sqlite3
+*.sqlite
+*.sqlite3
+
+# Generated Static/Media/Uploads/Reports
+backend/static/
+backend/media/
+backend/uploads/
+backend/reports/
+backend/audits/reports/
+*.pdf
+backend/*.pdf
+
+# Celery & PID
+backend/celerybeat-schedule
+backend/*.pid
+*.pid
+
+# Redis
+dump.rdb
+
+# Test/Cache
+.pytest_cache/
+backend/.pytest_cache/
+
+# ------------------------------------------
+# Security & Environment Files (Global)
+# ------------------------------------------
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+**/secret_key*
+**/secrets*
+**/certificates/
+**/certs/
+**/credentials/
+**/*.pem
+**/*.key
+**/*.pub
+**/*.cert
+logs/
+*.log
+
+# Allow Environment Examples
+!.env.example
+!backend/.env.example
+!frontend/.env.example
