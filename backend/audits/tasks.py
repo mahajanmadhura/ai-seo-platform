@@ -1,6 +1,7 @@
 from celery import shared_task
 from .models import Audit,CrawledPage
 from .crawler import fetch_url, parse_html
+from .analysers import calculate_on_page_score
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -23,15 +24,27 @@ def run_seo_audit(audit_id):
         try:
             status_code,html_text,load_time=fetch_url(current_url)
             result_of_parse=parse_html(html_text,current_url)
+            score = calculate_on_page_score(
+                    result_of_parse["title"],
+                    result_of_parse["h1"],
+                    result_of_parse["h2"],  # <--- Passing H2
+                    result_of_parse["h3"],  # <--- Passing H3
+                    result_of_parse["img_without_alt_tags"], # <--- Passing Images
+                    result_of_parse["meta_description"]
+                )
 
             CrawledPage.objects.create(audit=audit_website,
                                     url=current_url,
                                     status_code=status_code,
                                     title=result_of_parse["title"],
                                     h1=result_of_parse["h1"],
+                                    h2=result_of_parse["h2"],
+                                    h3=result_of_parse["h3"],
                                     meta_description=result_of_parse["meta_description"],
                                     word_count=result_of_parse["word_count"],
-                                    load_time=load_time)
+                                    load_time=load_time,
+                                    on_page_score=score,
+                                    img_without_alt_tags=result_of_parse["img_without_alt_tags"])
             
             for new_link in result_of_parse["links"]:
                 if new_link not in urls_to_visit:

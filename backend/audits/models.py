@@ -21,11 +21,14 @@ class CrawledPage(models.Model):
     status_code=models.IntegerField()
     title=models.CharField(max_length=255)
     h1=models.CharField(max_length=255)
+    h2=models.IntegerField(null=True,blank=True)
+    h3=models.IntegerField(null=True,blank=True)
     meta_description=models.TextField(null=True,blank=True)
     word_count=models.IntegerField()
     load_time=models.FloatField()
     on_page_score=models.IntegerField(null=True)
     technical_score=models.IntegerField(null=True)
+    img_without_alt_tags=models.JSONField(null=True)
 
 class SEOIssues(models.Model):
     issue_choices=[
