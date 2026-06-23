@@ -39,7 +39,9 @@ def parse_html(html_txt,base_url):
             if image_tag.get("alt"):
                 continue
             else:
-                img_without_alt_tags.append({"src":image_tag.get("src"),
+                raw_src=image_tag.get("src")
+                full_src=urljoin(base_url,raw_src)
+                img_without_alt_tags.append({"src":full_src,
                                              "alt":image_tag.get("alt")})
     
     anchor_tags=soup.find_all("a")

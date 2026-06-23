@@ -1,24 +1,10 @@
 from groq import Groq
 import os
 from dotenv import load_dotenv
-from .models import Audit,CrawledPage
+from .models import Audit,CrawledPage,SEOIssues
 load_dotenv()
 
-"""client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
 
-chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "user",
-            "content": "Explain the importance of fast language models",
-        }
-    ],
-    model="openai/gpt-oss-120b",
-)
-
-print(chat_completion.choices[0].message.content)"""
 
 def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description):
     score=0
@@ -46,3 +32,41 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
         score+=8
 
     return score
+
+def generate_ai_recommendations(audit):
+    issues=SEOIssues.objects.filter(url__audit=audit)
+
+    list_of_issues=[]
+    if not issues:
+        return "Good Job, No issues were found on the website"
+    
+    for issue in issues:
+        list_of_issues.append({issue.issue_type:issue.description})
+
+    client = Groq(
+    api_key=os.environ.get("GROQ_API_KEY"),
+    )
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content":f"""
+                    You are an expert Technical SEO Analyst. 
+                    I just audited a website and found these issues:
+                    {list_of_issues}
+                    Go through them and prepare an effective way of solving all the seo issues present on the users website
+                    Keep it professional and easy to understand.
+                """,
+            }
+        ],
+        model="llama-3.3-70b-versatile",
+    )
+
+    print(chat_completion.choices[0].message.content)
+    return chat_completion.choices[0].message.content
+
+
+
+
+

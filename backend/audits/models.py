@@ -14,6 +14,7 @@ class Audit(models.Model):
     completed_at=models.DateTimeField(null=True,blank=True)
     total_pages=models.IntegerField(default=0)
     total_issues=models.IntegerField(default=0)
+    ai_recommendation = models.TextField(null=True, blank=True)
 
 class CrawledPage(models.Model):
     audit=models.ForeignKey(Audit,on_delete=models.CASCADE)
