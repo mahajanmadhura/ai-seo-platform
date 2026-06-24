@@ -1,5 +1,9 @@
 from rest_framework import status
 from rest_framework.response import Response
+
+import razorpay
+from django.conf import settings
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
@@ -27,19 +31,32 @@ class CreatePaymentView(APIView):
     def post(self, request):
         serializer = CreatePaymentSerializer(data=request.data)
         if serializer.is_valid():
+            client = razorpay.Client(
+                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            )
+            amount = int(serializer.validated_data['amount'] * 100)
+            razorpay_order = client.order.create({
+                "amount": amount,
+                "currency": "INR",
+                "payment_capture": 1
+            })
             payment = Payment.objects.create(
                 user=request.user,
                 amount=serializer.validated_data['amount'],
                 credits_purchased=serializer.validated_data['credits_purchased'],
+                gateway='razorpay',
+                gateway_order_id=razorpay_order['id'],
                 status='pending',
             )
-            # NOTE: Yahan Razorpay/Stripe order create karne ka actual gateway call aayega
             return Response({
                 'payment_id': payment.id,
+                'razorpay_order_id': razorpay_order['id'],
+                'razorpay_key': settings.RAZORPAY_KEY_ID,
+                'amount': amount,
+                'currency': 'INR',
                 'message': 'Payment created, proceed to gateway',
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ConfirmPaymentView(APIView):
     permission_classes = [IsAuthenticated]
