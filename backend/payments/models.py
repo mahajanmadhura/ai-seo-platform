@@ -58,3 +58,21 @@ class CreditTransaction(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.transaction_type} - {self.amount}"
+    
+import secrets
+
+class APIKey(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='api_key'
+    )
+    key = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.key[:10]}..."
+
+    @staticmethod
+    def generate_key():
+        return secrets.token_hex(32)

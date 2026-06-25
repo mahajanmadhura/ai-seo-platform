@@ -9,6 +9,7 @@ from .views import (
     AdminCreditAdjustView,
     AdminAnalyticsView,
     AdminAuditLogsView,
+    GenerateAPIKeyView,
 )
 
 urlpatterns = [
@@ -23,4 +24,5 @@ urlpatterns = [
     path('admin/users/<int:user_id>/credits/', AdminCreditAdjustView.as_view(), name='admin-credit-adjust'),
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
     path('admin/audit-logs/', AdminAuditLogsView.as_view(), name='admin-audit-logs'),
+    path('users/me/api-key/', GenerateAPIKeyView.as_view(), name='api-key'),
 ]

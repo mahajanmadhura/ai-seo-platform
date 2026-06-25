@@ -198,3 +198,25 @@ class AdminAuditLogsView(APIView):
         transactions = CreditTransaction.objects.all().order_by('-created_at')[:100]
         serializer = CreditTransactionSerializer(transactions, many=True)
         return Response(serializer.data)
+    
+from .models import APIKey
+
+class GenerateAPIKeyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        api_key, created = APIKey.objects.get_or_create(user=request.user)
+        api_key.key = APIKey.generate_key()
+        api_key.save()
+        return Response({
+            'api_key': api_key.key,
+            'message': 'API key generated successfully'
+        })
+
+    def delete(self, request):
+        try:
+            api_key = APIKey.objects.get(user=request.user)
+            api_key.delete()
+            return Response({'message': 'API key revoked successfully'})
+        except APIKey.DoesNotExist:
+            return Response({'error': 'No API key found'}, status=status.HTTP_404_NOT_FOUND)
