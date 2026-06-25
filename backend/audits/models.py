@@ -15,6 +15,7 @@ class Audit(models.Model):
     total_pages=models.IntegerField(default=0)
     total_issues=models.IntegerField(default=0)
     ai_recommendation = models.TextField(null=True, blank=True)
+    key_word=models.CharField(max_length=255,null=True,blank=True)
 
 class CrawledPage(models.Model):
     audit=models.ForeignKey(Audit,on_delete=models.CASCADE)
@@ -30,6 +31,14 @@ class CrawledPage(models.Model):
     on_page_score=models.IntegerField(null=True)
     technical_score=models.IntegerField(null=True)
     img_without_alt_tags=models.JSONField(null=True)
+    canonical_tag_check=models.TextField()
+    bold_count=models.IntegerField(default=0)
+    url_structure_char_count=models.IntegerField(default=0)
+    keyword_in_title=models.BooleanField(default=False)
+    keyword_in_h1=models.BooleanField(default=False)
+    keyword_in_meta_description=models.BooleanField(default=False)
+    keyword_density=models.IntegerField(default=0)
+    keyword_in_h2_h3=models.BooleanField(default=False)
 
 class SEOIssues(models.Model):
     issue_choices=[

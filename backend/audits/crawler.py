@@ -13,7 +13,7 @@ def fetch_url(url):
 
     return response.status_code, response.text, load_time
 
-def parse_html(html_txt,base_url):
+def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
 
     if soup.find("title")==None:
@@ -55,9 +55,53 @@ def parse_html(html_txt,base_url):
             else:
                 continue
 
+    canonical_tag_check=""
+    canonical_tag = soup.find("link", rel="canonical")
+    if canonical_tag and canonical_tag.get("href"):
+        canonical_tag_check=canonical_tag.get("href")
+
+    bold_count=len(soup.find_all(["b","strong"]))
     
+    url_structure_char_count=len(base_url)
+
+    keyword_density=0
+    keyword_in_title=False
+    keyword_in_h1=False
+    keyword_in_meta_description=False
+    if key_word:
+
+        key_word_lower=key_word.lower()
+
+        if key_word_lower in title.lower():
+            keyword_in_title=True
+
+        words_in_page=soup.get_text().lower()
+
+        keyword_count=words_in_page.count(key_word_lower)
+        if word_count>0:
+            keyword_density=round((keyword_count/word_count)*100,2)
+
+        if key_word_lower in h1.lower():
+            keyword_in_h1=True
+
+        if key_word_lower in meta_content.lower():
+            keyword_in_meta_description=True
+
+        keyword_in_h2_h3 = False
+        
+        # 1. Find all H2 and H3 tags
+        h2_h3_tags = soup.find_all(['h2', 'h3'])
+        
+        # 2. Combine all their text into one massive lowercase string
+        h2_h3_text = " ".join([tag.text for tag in h2_h3_tags]).lower()
+        
+        # 3. Check if the keyword is in that massive string!
+        if key_word_lower in h2_h3_text:
+            keyword_in_h2_h3 = True
+        
 
 
+    
     return {"title": title,
             "h1":h1,
             "h2":h2,
@@ -66,4 +110,12 @@ def parse_html(html_txt,base_url):
             "links":links,
             "meta_description":meta_content,
             "img_without_alt_tags":img_without_alt_tags,
+            "canonical_tag_check":canonical_tag_check,
+            "bold_count":bold_count,
+            "url_structure_char_count":url_structure_char_count,
+            "keyword_in_title":keyword_in_title,
+            "keyword_in_h1":keyword_in_h1,
+            "keyword_in_meta_description":keyword_in_meta_description,
+            "keyword_density":keyword_density,
+            "keyword_in_h2_h3":keyword_in_h2_h3,
             }

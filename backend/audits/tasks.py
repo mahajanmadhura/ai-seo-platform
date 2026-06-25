@@ -1,7 +1,7 @@
 from celery import shared_task
 from .models import Audit,CrawledPage,SEOIssues
 from .crawler import fetch_url, parse_html
-from .analysers import calculate_on_page_score,generate_ai_recommendations
+from .analysers import calculate_on_page_score #,generate_ai_recommendations
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -13,6 +13,7 @@ def run_seo_audit(audit_id):
     urls_to_visit=[audit_website.website.url]
 
     visited_urls=set()
+
     while urls_to_visit and len(visited_urls)<=5:
         current_url=urls_to_visit.pop(0)
         if current_url in visited_urls:
@@ -23,14 +24,24 @@ def run_seo_audit(audit_id):
 
         try:
             status_code,html_text,load_time=fetch_url(current_url)
-            result_of_parse=parse_html(html_text,current_url)
+            result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
             score = calculate_on_page_score(
                         result_of_parse["title"],
                         result_of_parse["h1"],
-                        result_of_parse["h2"],  # <--- Passing H2
-                        result_of_parse["h3"],  # <--- Passing H3
-                        result_of_parse["img_without_alt_tags"], # <--- Passing Images
-                        result_of_parse["meta_description"]
+                        result_of_parse["h2"],  
+                        result_of_parse["h3"],  
+                        result_of_parse["img_without_alt_tags"], 
+                        result_of_parse["meta_description"],
+                        result_of_parse["canonical_tag_check"],
+                        result_of_parse["bold_count"],
+                        result_of_parse["url_structure_char_count"],
+                        current_url,
+                        result_of_parse["links"],
+                        result_of_parse["keyword_in_title"],
+                        result_of_parse["keyword_in_h1"],
+                        result_of_parse["keyword_in_meta_description"],
+                        result_of_parse["keyword_density"],
+                        result_of_parse["keyword_in_h2_h3"],
                     )
 
             new_page = CrawledPage.objects.create(
@@ -45,7 +56,15 @@ def run_seo_audit(audit_id):
                             word_count=result_of_parse["word_count"],
                             load_time=load_time,
                             on_page_score=score,
-                            img_without_alt_tags=result_of_parse["img_without_alt_tags"]
+                            img_without_alt_tags=result_of_parse["img_without_alt_tags"],
+                            canonical_tag_check=result_of_parse["canonical_tag_check"],
+                            bold_count=result_of_parse["bold_count"],
+                            url_structure_char_count=result_of_parse["url_structure_char_count"],
+                            keyword_in_title=result_of_parse["keyword_in_title"],
+                            keyword_density=result_of_parse["keyword_density"],
+                            keyword_in_h1=result_of_parse["keyword_in_h1"],
+                            keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
+                            keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],                                    
                         )
 
             if result_of_parse["h1"]=="No h1 tags found":
@@ -89,6 +108,27 @@ def run_seo_audit(audit_id):
                     issue_type="ERROR",
                     description=f"Missing meta description tag on {current_url}",
                 )
+            
+            if result_of_parse["canonical_tag_check"]=="":
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"Missing canonical tag on {current_url}",
+                )
+
+            if result_of_parse["bold_count"]==0:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"No bold tags found on {current_url}",
+                )
+            
+            if result_of_parse["url_structure_char_count"]>100:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"url is longer than 100 characters on the {current_url}",
+                )
 
 
             
@@ -97,14 +137,16 @@ def run_seo_audit(audit_id):
                     urls_to_visit.append(new_link)
         except Exception as e:
             print(f"Audit failed, Error: {e}")
+        
+    
 
-    if len(visited_urls)>0:
-        ai_response=generate_ai_recommendations(audit_website)
-        audit_website.ai_recommendation=ai_response
-        audit_website.status="DONE"
+    # if len(visited_urls)>0:
+    #     ai_response=generate_ai_recommendations(audit_website)
+    #     audit_website.ai_recommendation=ai_response
+    #     audit_website.status="DONE"
 
-    else:
-        audit_website.status="FAILED"
+    # else:
+    #     audit_website.status="FAILED"
 
     
     audit_website.save()
