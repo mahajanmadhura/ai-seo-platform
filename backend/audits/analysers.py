@@ -8,20 +8,34 @@ load_dotenv()
 
 def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
     score=0
+
+    #title 7+8=15 or 3+8=11
     if title!="No title found":
         if 30<len(title)<65:
-            score+=15
+            score+=7
         else:
+            score+=3
+        
+        if keyword_in_title:
             score+=8
-            
+       
+    #meta_description 5+5=10 or 2+5=7  
     if meta_description!="No meta description":
         if 120<len(meta_description)<160:
-            score+=10
+            score+=5
         else:
+            score+=2
+        
+        if keyword_in_meta_description:
             score+=5
 
+
     if h1!="No h1 tags found":
-        score+=10
+        score+=5
+
+        if keyword_in_h1:
+            score+=5
+
 
     if h2!=0:
         score+=1.5
@@ -29,6 +43,7 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
         score+=1.5
     if keyword_in_h2_h3:
         score+=2    
+
 
     if len(img_without_alt_tags)==0:
         score+=8
@@ -51,17 +66,14 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
     if internal_link_count > 0:
         score += 12
     
-    if keyword_in_title:
-        score+=3
+    
 
-    if keyword_density!=0:
-        score+=3
+    if 1.0<keyword_density<3.0:
+        score+=12
+    elif keyword_density>3.0:
+        score-=5
     
-    if keyword_in_h1:
-        score+=3
     
-    if keyword_in_meta_description:
-        score+=3
 
     
         

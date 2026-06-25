@@ -68,6 +68,8 @@ def parse_html(html_txt,base_url,key_word):
     keyword_in_title=False
     keyword_in_h1=False
     keyword_in_meta_description=False
+    keyword_in_h2_h3 = False
+    
     if key_word:
 
         key_word_lower=key_word.lower()
@@ -86,22 +88,17 @@ def parse_html(html_txt,base_url,key_word):
 
         if key_word_lower in meta_content.lower():
             keyword_in_meta_description=True
-
-        keyword_in_h2_h3 = False
         
         # 1. Find all H2 and H3 tags
         h2_h3_tags = soup.find_all(['h2', 'h3'])
+        if len(h2_h3_tags)!=0:
+            # 2. Combine all their text into one massive lowercase string
+            h2_h3_text = " ".join([tag.text for tag in h2_h3_tags]).lower()
+            
+            # 3. Check if the keyword is in that massive string!
+            if key_word_lower in h2_h3_text:
+                keyword_in_h2_h3 = True
         
-        # 2. Combine all their text into one massive lowercase string
-        h2_h3_text = " ".join([tag.text for tag in h2_h3_tags]).lower()
-        
-        # 3. Check if the keyword is in that massive string!
-        if key_word_lower in h2_h3_text:
-            keyword_in_h2_h3 = True
-        
-
-
-    
     return {"title": title,
             "h1":h1,
             "h2":h2,
