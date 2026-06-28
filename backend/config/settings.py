@@ -32,10 +32,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'django_celery_results',
+    'channels',
     'rest_framework',
     'accounts',
     'websites',
     'audits',
+    'payments',
+
 ]
 
 MIDDLEWARE = [
@@ -71,8 +75,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'seo_db',
+        'USER': 'seo_user',
+        'PASSWORD': 'seo_pass',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -100,12 +108,7 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 }
 
 # Where Celery should store the results of the tasks once they are done
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
-CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-    'client_kwargs': {
-        'protocol': 2
-    }
-}
+CELERY_RESULT_BACKEND = 'django-db'
 
 # Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
@@ -124,3 +127,23 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Channels Configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
+
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
