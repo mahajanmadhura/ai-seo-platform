@@ -35,7 +35,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
 
         user.is_active = True
-        user.is_verified = True
+        user.is_verified = False
 
         # Generate token ONLY HERE
         raw_token, hashed_token = generate_token()

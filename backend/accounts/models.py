@@ -35,7 +35,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True) 
-    is_verified = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False)
 
     verification_token = models.CharField(max_length=255, blank=True, null=True)
     verification_token_expiry = models.DateTimeField(blank=True, null=True)

@@ -22,7 +22,7 @@ class Home(APIView):
     def get(self, request):
         return Response({
             "success": True,
-            "message": "Welcome to the Video Caption Generator API!"
+            "message": "AI SEO Auditor!"
         }, status=status.HTTP_200_OK)
 
 

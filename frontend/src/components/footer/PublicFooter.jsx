@@ -1,11 +1,11 @@
-import { Link } from 'react-router-dom'
-import { Zap } from 'lucide-react'
-import LogoWhite from '../assets/White.png'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import LogoWhite from '../../assets/White.png';
 
-const Footer = () => {
+const PublicFooter = () => {
   return (
-    <footer className="bg-deep-green border-t border-white/10 py-12 sm:py-16 px-6">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-[34px] md:gap-[55px] text-left">
+    <footer className="public-footer">
+      <div className="public-footer-container">
         <div className="space-y-[21px] md:col-span-2 flex flex-col items-start">
           <Link to="/" className="flex items-center">
             <img src={LogoWhite} alt="Athenura" className="h-[44px] w-auto object-contain" />
@@ -25,13 +25,10 @@ const Footer = () => {
               <a href="#reports" className="hover:text-growth-green transition-colors">Reports</a>
             </li>
             <li>
-              <Link to="/dashboard" className="hover:text-growth-green transition-colors">Dashboard</Link>
+              <Link to="/register" className="hover:text-growth-green transition-colors">Run SEO Audit</Link>
             </li>
             <li>
-              <a href="#pricing" className="hover:text-growth-green transition-colors">Pricing</a>
-            </li>
-            <li>
-              <Link to="/login" className="hover:text-growth-green transition-colors">Login</Link>
+              <Link to="/login" className="hover:text-growth-green transition-colors">Sign In</Link>
             </li>
           </ul>
         </div>
@@ -40,27 +37,29 @@ const Footer = () => {
           <h4 className="text-white text-xs font-black uppercase tracking-widest">SEO Capabilities</h4>
           <ul className="space-y-2 text-sm text-muted-text">
             <li>
+              <a href="#features" className="hover:text-growth-green transition-colors">Technical SEO</a>
+            </li>
+            <li>
               <a href="#features" className="hover:text-growth-green transition-colors">On-Page SEO</a>
             </li>
             <li>
-              <a href="#features" className="hover:text-growth-green transition-colors">Technical SEO</a>
+              <a href="#features" className="hover:text-growth-green transition-colors">Performance</a>
             </li>
             <li>
               <a href="#features" className="hover:text-growth-green transition-colors">AI Recommendations</a>
             </li>
             <li>
-              <a href="#reports" className="hover:text-growth-green transition-colors">PDF Reports</a>
+              <a href="#features" className="hover:text-growth-green transition-colors">PDF Reports</a>
             </li>
           </ul>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto mt-[34px] pt-[21px] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-muted-text/80 gap-4">
-        <p>&copy; {new Date().getFullYear()} Athenura. All rights reserved.</p>
-        <p className="font-medium">Built for search visibility and organic intelligence.</p>
+        <p>&copy; 2026 Athenura. All rights reserved.</p>
       </div>
     </footer>
-  )
-}
+  );
+};
 
-export default Footer
+export default PublicFooter;

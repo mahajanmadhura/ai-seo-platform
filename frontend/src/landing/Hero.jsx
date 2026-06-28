@@ -1,167 +1,177 @@
-import React from 'react'
-import { Search, AlertCircle, Sparkles, Check, CheckCircle2, FileText, Smartphone, Gauge, Shield, Link2, Monitor } from 'lucide-react'
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, AlertCircle, Sparkles, Check, FileText, Smartphone, Gauge, Shield, Link2, Monitor, ArrowRight, CheckCircle2 } from 'lucide-react'
 
 const Hero = () => {
+  const navigate = useNavigate()
+  const [urlInput, setUrlInput] = useState('')
+
+  const handleRunAudit = () => {
+    navigate('/register')
+  }
+
+  const handleScrollToReports = () => {
+    const el = document.getElementById('reports')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   const trustPoints = [
     'No monthly commitment',
     'Agency-ready reports',
-    'AI recommendations',
-    'Technical + on-page audit',
+    'AI-prioritized actions',
   ]
 
-  const scores = [
-    { label: 'Technical SEO', score: 78, icon: Monitor, color: 'text-blue-500' },
-    { label: 'On-Page SEO', score: 86, icon: FileText, color: 'text-emerald-500' },
-    { label: 'Performance', score: 72, icon: Gauge, color: 'text-yellow-500' },
-    { label: 'Mobile SEO', score: 90, icon: Smartphone, color: 'text-purple-500' },
-    { label: 'Security', score: 95, icon: Shield, color: 'text-cyan-500' },
-    { label: 'Link Analysis', score: 81, icon: Link2, color: 'text-[#84FF00]' },
+  const categories = [
+    { label: 'Technical SEO', icon: Monitor },
+    { label: 'On-Page SEO', icon: FileText },
+    { label: 'Performance', icon: Gauge },
+    { label: 'Mobile SEO', icon: Smartphone },
+    { label: 'Security', icon: Shield },
+    { label: 'Link Analysis', icon: Link2 },
   ]
 
   return (
     <header className="relative pt-32 sm:pt-40 pb-16 sm:pb-24 px-6 max-w-7xl mx-auto overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-10 left-10 w-[400px] h-[400px] bg-[#84FF00]/5 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-growth-green/5 rounded-full blur-[140px] -z-10 pointer-events-none"></div>
 
-      <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-        {/* Left Column: Copy & Form */}
-        <div className="space-y-8 text-left">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#84FF00]/20 bg-[#84FF00]/5 text-[#84FF00] text-xs font-bold uppercase tracking-widest">
-            <span className="w-2 h-2 rounded-full bg-[#84FF00] animate-pulse"></span>
+      <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <div className="lg:col-span-7 space-y-8 text-left">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-forest-green/10 bg-mint-surface text-deep-green text-[10px] font-black uppercase tracking-[0.25em]">
+            <span className="w-2.5 h-2.5 rounded-full bg-growth-green shadow-[0_0_8px_rgba(54,230,130,0.8)] animate-pulse"></span>
             AI SEO Precision Lab
           </div>
 
-          {/* Headline & Subheadline */}
           <div className="space-y-4">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white">
+            <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-black tracking-tight leading-[1.08] text-deep-green">
               AI SEO audits that turn website issues into client-ready action plans.
             </h1>
-            <p className="text-gray-400 text-sm sm:text-base md:text-lg max-w-xl leading-relaxed">
-              Analyze technical SEO, on-page signals, performance, mobile readiness, security, and links. Get AI-powered recommendations and professional reports in minutes.
+            <p className="text-muted-text text-sm sm:text-base md:text-lg max-w-xl leading-relaxed">
+              Analyze technical SEO, on-page signals, performance, mobile readiness, security, and links. Get prioritized AI recommendations and export professional reports in minutes.
             </p>
           </div>
 
-          {/* Analyzer Widget */}
-          <div className="space-y-4">
-            <div className="relative max-w-md group">
-              <div className="absolute -inset-0.5 bg-[#84FF00] rounded-full blur opacity-15 group-hover:opacity-20 transition-all duration-300"></div>
-              <div className="relative flex bg-[#0c0f0f] border border-white/10 rounded-full overflow-hidden p-1.5 focus-within:border-[#84FF00]/40 focus-within:ring-2 focus-within:ring-[#84FF00]/5 transition-all duration-300">
+          <div className="space-y-4 max-w-xl">
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-growth-green rounded-2xl blur opacity-15 group-focus-within:opacity-30 transition-all duration-300"></div>
+              <div className="relative flex bg-white border border-border-color rounded-2xl p-1.5 focus-within:border-deep-green focus-within:ring-4 focus-within:ring-deep-green/5 shadow-lg shadow-deep-green/[0.03] transition-all duration-300">
                 <input
                   type="text"
-                  placeholder="Enter website URL"
-                  className="bg-transparent border-none focus:ring-0 text-white flex-1 px-4 py-3 outline-none text-sm font-medium placeholder-gray-600"
+                  placeholder="Enter website URL (e.g. stellar-studio.co)"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="bg-transparent border-none focus:ring-0 text-deep-green flex-1 px-4 py-3 outline-none text-sm font-semibold placeholder-muted-text/40"
                 />
                 <button
                   id="hero-analyze-btn"
-                  className="bg-[#84FF00] text-black px-6 py-3 rounded-full font-bold hover:bg-[#a3ff47] hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_15px_rgba(132,255,0,0.3)] cursor-pointer text-sm flex-shrink-0"
+                  onClick={handleRunAudit}
+                  className="bg-growth-green text-deep-green px-7 py-3 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-growth-green/90 active:scale-95 transition-all duration-200 shadow-md flex items-center gap-2 cursor-pointer"
                 >
-                  Run SEO Audit
+                  <span>Run SEO Audit</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* CTAs Secondary Row */}
             <div className="flex items-center gap-4">
               <button
-                className="text-xs font-bold text-[#84FF00] hover:text-white transition-colors duration-200 border-b border-[#84FF00]/30 hover:border-white pb-0.5"
-                onClick={() => window.open('#reports', '_self')}
+                className="text-xs font-bold text-deep-green hover:text-forest-green transition-colors duration-200 border-b border-deep-green/30 hover:border-deep-green pb-0.5 cursor-pointer"
+                onClick={handleScrollToReports}
               >
                 View Sample Report &rarr;
               </button>
             </div>
           </div>
 
-          {/* Trust Points */}
-          <div className="grid grid-cols-2 gap-y-3 sm:flex sm:items-center sm:gap-x-6 gap-x-4 pt-2">
+          <div className="flex flex-wrap items-center gap-y-3 gap-x-6 pt-2">
             {trustPoints.map((point, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                <CheckCircle2 className="w-4 h-4 text-[#84FF00]" />
+              <div key={idx} className="flex items-center gap-2 text-xs font-bold text-muted-text">
+                <CheckCircle2 className="w-4.5 h-4.5 text-growth-green flex-shrink-0" />
                 <span>{point}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right Column: Visualization Card */}
-        <div className="relative w-full max-w-xl mx-auto lg:max-w-none">
-          <div className="absolute -bottom-10 -left-10 w-[350px] h-[350px] bg-[#84FF00]/10 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
-
-          {/* Dashboard Card */}
-          <div className="warm-glass rounded-[40px] p-6 sm:p-8 text-black min-h-[480px] relative z-10 overflow-hidden shadow-2xl border border-white/20">
-            {/* Header info */}
-            <div className="flex items-center justify-between mb-6 border-b border-black/5 pb-4">
+        <div className="lg:col-span-5 relative w-full max-w-lg mx-auto lg:max-w-none">
+          <div className="absolute -inset-4 bg-deep-green rounded-[48px] shadow-2xl -z-10 pointer-events-none transform -rotate-1"></div>
+          
+          <div className="bg-deep-green rounded-[40px] p-6 sm:p-8 text-white min-h-[470px] relative z-10 overflow-hidden flex flex-col justify-between border border-white/10 shadow-2xl">
+            <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white shadow-lg">
-                  <Search className="w-5 h-5" />
+                <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-growth-green shadow-inner">
+                  <Search className="w-4.5 h-4.5" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider leading-none">Domain Analysis</p>
-                  <p className="text-sm font-extrabold text-black">stellar-studio.co</p>
+                  <p className="text-[9px] uppercase font-black text-muted-text tracking-widest leading-none">Domain Snapshot</p>
+                  <p className="text-xs font-black text-white tracking-wide mt-1">stellar-studio.co</p>
                 </div>
               </div>
-              <div className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Audit Ready
+              <div className="bg-growth-green/10 text-growth-green border border-growth-green/20 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider">
+                Audit Active
               </div>
             </div>
 
-            {/* Score Grid & Overall Score */}
-            <div className="flex flex-col sm:flex-row gap-6 mb-6">
-              {/* Overall */}
-              <div className="bg-black text-white rounded-3xl p-6 flex flex-col justify-between sm:w-[40%] text-left relative overflow-hidden shadow-xl">
-                <div className="absolute top-0 right-0 p-3 opacity-10">
-                  <Sparkles className="w-8 h-8 text-[#84FF00]" />
+            <div className="relative flex-1 min-h-[250px] mb-4">
+              <div className="bg-card-white text-deep-green rounded-3xl p-5 shadow-xl w-[60%] text-left transform -rotate-2 relative z-20 border border-border-color">
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-[8px] uppercase tracking-widest font-black text-muted-text">Overall SEO</span>
+                  <Sparkles className="w-4 h-4 text-growth-green fill-growth-green/20" />
                 </div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-gray-500 mb-4">Overall Score</p>
-                <div>
-                  <h3 className="text-5xl font-black text-[#84FF00]">84</h3>
-                  <p className="text-xs text-gray-400 font-bold mt-1">/100 points</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-black tracking-tight text-deep-green">84</span>
+                  <span className="text-xs font-bold text-muted-text">/100</span>
+                </div>
+                <div className="w-full bg-mint-surface h-1.5 rounded-full overflow-hidden mt-3.5">
+                  <div className="bg-growth-green h-full rounded-full" style={{ width: '84%' }} />
+                </div>
+                <p className="text-[10px] font-bold text-forest-green mt-3.5 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-growth-green"></span>
+                  Passed 82% of checks
+                </p>
+              </div>
+
+              <div className="bg-mint-surface text-deep-green rounded-2xl p-4 shadow-lg absolute right-[-10px] top-[20px] z-30 max-w-[190px] border border-border-color transform rotate-3 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div className="text-left space-y-0.5">
+                  <span className="text-[8px] font-black uppercase text-red-600 tracking-wider">Critical Issues</span>
+                  <p className="text-lg font-black text-deep-green leading-none">12</p>
+                  <p className="text-[9px] text-muted-text font-semibold">Immediate fixes required</p>
                 </div>
               </div>
 
-              {/* Six Dimensions */}
-              <div className="flex-1 grid grid-cols-2 gap-3 text-left">
-                {scores.map((stat, idx) => {
-                  const Icon = stat.icon
+              <div className="bg-card-white text-deep-green rounded-2xl p-4 shadow-md absolute right-[-20px] bottom-[70px] z-25 max-w-[180px] border border-border-color transform -rotate-1 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-growth-green/10 border border-growth-green/20 text-forest-green flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-growth-green" />
+                </div>
+                <div className="text-left space-y-0.5">
+                  <span className="text-[8px] font-black uppercase text-forest-green tracking-wider">Recommendations</span>
+                  <p className="text-lg font-black text-deep-green leading-none">28</p>
+                  <p className="text-[9px] text-muted-text font-semibold">Quick organic wins</p>
+                </div>
+              </div>
+
+              <div className="bg-deep-green border border-white/10 text-white rounded-xl px-4 py-2.5 shadow-md absolute left-[-15px] bottom-[15px] z-30 flex items-center gap-2 transform rotate-1">
+                <FileText className="w-4 h-4 text-growth-green" />
+                <span className="text-[10px] font-bold tracking-wide uppercase">PDF Report Ready</span>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-4 mt-2">
+              <p className="text-[9px] uppercase tracking-widest font-black text-muted-text mb-3 text-left">Audit Scope Includes</p>
+              <div className="grid grid-cols-3 gap-2 text-left">
+                {categories.map((cat, idx) => {
+                  const Icon = cat.icon
                   return (
-                    <div key={idx} className="bg-black/5 rounded-2xl p-3.5 border border-black/5 flex items-center justify-between hover:bg-black/10 transition-colors">
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-gray-500 font-bold leading-none">{stat.label}</p>
-                        <span className="text-base font-black text-black">{stat.score}</span>
-                      </div>
-                      <Icon className={`w-4 h-4 ${stat.color} opacity-80`} />
+                    <div key={idx} className="bg-white/5 rounded-lg p-2 flex items-center gap-2 border border-white/5 hover:bg-white/10 transition-colors duration-200">
+                      <Icon className="w-3.5 h-3.5 text-growth-green" />
+                      <span className="text-[9px] font-bold text-white tracking-wide truncate">{cat.label}</span>
                     </div>
                   )
                 })}
-              </div>
-            </div>
-
-            {/* Issues Summary */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3.5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="text-red-500 w-4 h-4" />
-                  <span className="text-xs sm:text-sm font-bold text-gray-800">12 Critical Issues found</span>
-                </div>
-                <span className="text-[10px] font-black uppercase text-red-500">Fix Immediately</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3.5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="text-yellow-500 w-4 h-4" />
-                  <span className="text-xs sm:text-sm font-bold text-gray-700">28 Recommendations</span>
-                </div>
-                <span className="text-[10px] font-black uppercase text-yellow-600">Quick Wins</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3.5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2">
-                  <Check className="text-green-600 w-4 h-4" />
-                  <span className="text-xs sm:text-sm font-bold text-gray-600">PDF Report Ready</span>
-                </div>
-                <span className="text-[10px] bg-black text-[#84FF00] px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                  Download
-                </span>
               </div>
             </div>
           </div>

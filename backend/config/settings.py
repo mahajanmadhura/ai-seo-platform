@@ -17,7 +17,7 @@ ALLOWED_HOSTS = ['*']
 
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
-DOMAIN_NAME = os.getenv("AI SEO Platform")
+DOMAIN_NAME = os.getenv("DOMAIN_NAME", "SEO Ecosystem")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'accounts',
     'websites',
@@ -40,6 +41,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -89,6 +91,7 @@ REST_FRAMEWORK = {
 # CELERY (optional)
 # ==================================
 CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+
 # Force Redis client to use RESP2 (protocol 2) since local Redis server might be older version (e.g. on Windows)
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'client_kwargs': {
@@ -103,6 +106,8 @@ CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
         'protocol': 2
     }
 }
+
+# Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -114,3 +119,8 @@ CELERY_TIMEZONE = 'UTC'
 STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]

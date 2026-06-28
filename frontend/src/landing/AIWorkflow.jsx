@@ -6,72 +6,83 @@ const AIWorkflow = () => {
     {
       number: '01',
       title: 'Submit Website',
-      description: 'Enter a domain and start an audit.',
+      description: 'Enter your domain address to launch the process.',
       icon: Globe,
     },
     {
       number: '02',
-      title: 'Crawl & Analyze',
-      description: 'The engine checks on-page, technical, mobile, security, performance, and link signals.',
+      title: 'Deep Crawl',
+      description: 'Our engine checks hundreds of indicators instantly.',
       icon: Cpu,
     },
     {
       number: '03',
-      title: 'Score & Prioritize',
-      description: 'Issues are grouped by severity: Critical, High, Medium, and Low.',
+      title: 'Prioritize Issues',
+      description: 'We group problems by SEO severity rankings.',
       icon: BarChart3,
     },
     {
       number: '04',
-      title: 'Generate AI Recommendations',
-      description: 'AI converts audit data into clear fixes and quick wins.',
+      title: 'AI Fix Advice',
+      description: 'AI provides clear, developer-ready instructions.',
       icon: Sparkles,
     },
     {
       number: '05',
-      title: 'Export Report',
-      description: 'Download a professional client-ready SEO report.',
+      title: 'Export Audit',
+      description: 'Download the final client-ready PDF report.',
       icon: FileSpreadsheet,
     },
   ]
 
   return (
-    <section className="py-16 sm:py-24 px-6 bg-[#060909] relative">
-      <div className="max-w-7xl mx-auto">
-        {/* Title */}
-        <div className="text-center mb-16 max-w-2xl mx-auto space-y-4">
+    <section id="how-it-works" className="py-16 sm:py-24 px-6 max-w-7xl mx-auto">
+      <div className="bg-deep-green rounded-[48px] p-8 sm:p-12 md:p-16 relative overflow-hidden shadow-2xl border border-white/10 text-center">
+        
+        <div className="absolute inset-0 bg-[radial-gradient(#36E682_1px,transparent_1px)] opacity-[0.03] [background-size:32px_32px] pointer-events-none"></div>
+
+        <div className="max-w-2xl mx-auto space-y-4 mb-16 relative z-10">
+          <p className="text-growth-green text-[10px] font-black uppercase tracking-[0.25em]">Workflow Process</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
-            From website URL to prioritized SEO action plan
+            From raw URL to prioritised action plan
           </h2>
-          <p className="text-gray-500 text-sm sm:text-base">
+          <p className="text-muted-text text-sm sm:text-base leading-relaxed">
             Our step-by-step intelligence engine crawls, scores, and transforms raw technical data into client-ready insights.
           </p>
         </div>
 
-        {/* Timeline Layout */}
-        <div className="grid md:grid-cols-5 gap-8 relative">
-          {/* Connector Line (Desktop) */}
-          <div className="absolute top-[34px] left-[5%] right-[5%] h-0.5 bg-white/10 hidden md:block z-0"></div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 lg:gap-10 relative z-10">
+          <div className="absolute top-[38px] left-[10%] right-[10%] h-[1px] bg-white/10 hidden md:block z-0"></div>
 
           {steps.map((step, idx) => {
-            const IconComponent = step.icon
+            const Icon = step.icon
             return (
-              <div key={idx} className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left space-y-4">
-                {/* Step Circle */}
-                <div className="w-16 h-16 rounded-full bg-[#0c0f0f] border border-white/10 flex items-center justify-center text-[#84FF00] shadow-xl hover:border-[#84FF00]/40 transition-colors duration-300">
-                  <IconComponent className="w-6 h-6" />
+              <div 
+                key={idx} 
+                className="relative z-10 flex flex-col items-center text-center space-y-4 group"
+              >
+                <div className="w-16 h-16 rounded-full bg-deep-green border border-white/10 flex items-center justify-center text-growth-green shadow-xl group-hover:border-growth-green/40 group-hover:scale-105 transition-all duration-300 relative">
+                  <Icon className="w-6 h-6" />
+                  
+                  <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-growth-green text-deep-green border-2 border-deep-green text-[10px] font-black flex items-center justify-center">
+                    {step.number}
+                  </span>
                 </div>
 
-                {/* Step Info */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-center md:justify-start gap-2">
-                    <span className="text-[10px] font-black text-gray-600 tracking-widest">{step.number}</span>
-                    <h3 className="font-extrabold text-white text-base">{step.title}</h3>
-                  </div>
-                  <p className="text-gray-400 text-xs sm:text-sm leading-relaxed max-w-[200px] mx-auto md:mx-0">
+                  <h3 className="font-extrabold text-white text-base leading-snug">
+                    {step.title}
+                  </h3>
+                  <p className="text-muted-text text-xs leading-relaxed max-w-[170px] mx-auto">
                     {step.description}
                   </p>
                 </div>
+
+                {idx < steps.length - 1 && (
+                  <div className="md:hidden text-growth-green/30 pt-2 animate-pulse">
+                    &darr;
+                  </div>
+                )}
               </div>
             )
           })}
