@@ -163,5 +163,4 @@ def check_technical_files(base_url):
 
     return has_robots,has_sitemaps
 
-def
 

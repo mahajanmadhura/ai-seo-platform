@@ -90,7 +90,7 @@ def run_seo_audit(audit_id):
                             keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
                             keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
                             is_mobile_friendly=result_of_parse["is_mobile_friendly"],
-                            is_safe=result_of_parse["is_safe"]  
+                            is_safe=result_of_parse["is_safe"],
                             performance_score=performance_score,                        
                         )
 
