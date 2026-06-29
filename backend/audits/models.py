@@ -16,6 +16,9 @@ class Audit(models.Model):
     total_issues=models.IntegerField(default=0)
     ai_recommendation = models.TextField(null=True, blank=True)
     key_word=models.CharField(max_length=255,null=True,blank=True)
+    has_sitemap=models.BooleanField(default=False)
+    has_robots=models.BooleanField(default=False)
+    
 
 class CrawledPage(models.Model):
     audit=models.ForeignKey(Audit,on_delete=models.CASCADE)
@@ -39,6 +42,11 @@ class CrawledPage(models.Model):
     keyword_in_meta_description=models.BooleanField(default=False)
     keyword_density=models.IntegerField(default=0)
     keyword_in_h2_h3=models.BooleanField(default=False)
+    is_mobile_friendly=models.BooleanField(default=False)
+    is_safe=models.BooleanField(default=False)
+    performance_score=models.IntegerField(null=True, blank=True)
+    
+    
 
 class SEOIssues(models.Model):
     issue_choices=[
@@ -46,7 +54,8 @@ class SEOIssues(models.Model):
         ("WARNING","⚠️ Warning"),
         ("NOTICE", "📢 Notice")
     ]
-    url=models.ForeignKey(CrawledPage,on_delete=models.CASCADE)
+    url=models.ForeignKey(CrawledPage,on_delete=models.CASCADE,null=True,blank=True)
+    audit=models.ForeignKey(Audit,on_delete=models.CASCADE,blank=True,null=True)
     issue_type=models.CharField(max_length=20,choices=issue_choices)
     description=models.TextField()
     is_fixed=models.BooleanField(default=False)

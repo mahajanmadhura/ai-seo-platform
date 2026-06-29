@@ -6,7 +6,7 @@ load_dotenv()
 
 
 
-def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
+def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3,is_mobile_friendly):
     score=0
 
     #title 7+8=15 or 3+8=11
@@ -78,6 +78,20 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
     
         
     print(score)
+    return score
+
+
+def calculate_performance_score(load_time):
+    score=100
+    if load_time < 1.0:
+        score = 100 # Lightning fast
+    elif 1.0 <= load_time <= 2.5:
+        score = 80  # Good, but could be better
+    elif 2.5 < load_time <= 4.0:
+        score = 50  # Needs Work
+    else:
+        score = 20  # Dangerously slow
+        
     return score
 
 #def generate_ai_recommendations(audit):

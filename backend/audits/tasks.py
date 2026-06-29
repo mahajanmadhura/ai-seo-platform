@@ -1,7 +1,7 @@
 from celery import shared_task
 from .models import Audit,CrawledPage,SEOIssues
-from .crawler import fetch_url, parse_html
-from .analysers import calculate_on_page_score #,generate_ai_recommendations
+from .crawler import fetch_url, parse_html, check_technical_files
+from .analysers import calculate_on_page_score,calculate_performance_score #,generate_ai_recommendations
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -11,8 +11,26 @@ def run_seo_audit(audit_id):
     print(f"We are going to audit the website with id {audit_id}")
 
     urls_to_visit=[audit_website.website.url]
-
     visited_urls=set()
+
+    robots,sitemap=check_technical_files(audit_website.website.url)
+    audit_website.has_robots=robots
+    audit_website.has_sitemap=sitemap
+    audit_website.save()
+
+    if not robots:
+        SEOIssues.objects.create(
+            audit=audit_website,
+            issue_type="ERROR",
+            description="'robots.txt' couldnt be found"
+        )
+    if not sitemap:
+        SEOIssues.objects.create(
+            audit=audit_website,
+            issue_type="WARNING",
+            description="'sitemap.txt' couldnt be found"
+        )
+
 
     while urls_to_visit and len(visited_urls)<=5:
         current_url=urls_to_visit.pop(0)
@@ -23,8 +41,12 @@ def run_seo_audit(audit_id):
         visited_urls.add(current_url)
 
         try:
+            
             status_code,html_text,load_time=fetch_url(current_url)
             result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
+
+            performance_score = calculate_performance_score(load_time)
+
             score = calculate_on_page_score(
                         result_of_parse["title"],
                         result_of_parse["h1"],
@@ -42,6 +64,8 @@ def run_seo_audit(audit_id):
                         result_of_parse["keyword_in_meta_description"],
                         result_of_parse["keyword_density"],
                         result_of_parse["keyword_in_h2_h3"],
+                        result_of_parse["is_mobile_friendly"],
+
                     )
 
             new_page = CrawledPage.objects.create(
@@ -64,7 +88,10 @@ def run_seo_audit(audit_id):
                             keyword_density=result_of_parse["keyword_density"],
                             keyword_in_h1=result_of_parse["keyword_in_h1"],
                             keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
-                            keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],                                    
+                            keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
+                            is_mobile_friendly=result_of_parse["is_mobile_friendly"],
+                            is_safe=result_of_parse["is_safe"]  
+                            performance_score=performance_score,                        
                         )
 
             if result_of_parse["h1"]=="No h1 tags found":
@@ -128,6 +155,27 @@ def run_seo_audit(audit_id):
                     url=new_page,
                     issue_type="ERROR",
                     description=f"url is longer than 100 characters on the {current_url}",
+                )
+            
+            if not result_of_parse["is_mobile_friendly"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website isnt mobile responsive as viewport is absent on {current_url}"
+                )
+
+            if not result_of_parse["is_safe"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"Missing SSL certificate: Website isnt secure as it doesnt have https on {current_url}"
+                )
+            
+            if load_time > 2.5:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="WARNING",
+                    description=f"Slow page load time ({load_time}s) on {current_url}. Target is < 2.5s."
                 )
 
 

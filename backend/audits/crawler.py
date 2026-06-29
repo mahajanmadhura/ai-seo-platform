@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urljoin,urlparse
 import time
 
 
@@ -99,6 +99,18 @@ def parse_html(html_txt,base_url,key_word):
             if key_word_lower in h2_h3_text:
                 keyword_in_h2_h3 = True
         
+        is_mobile_friendly=False
+        viewport_tag=soup.find("meta", attrs=({"name":"viewport"}))
+        if viewport_tag and viewport_tag.get("content"):
+            is_mobile_friendly=True
+
+        is_safe=False
+        str="https://google.com"
+        if base_url.startswith("https"):
+            is_safe=True
+        
+        
+
     return {"title": title,
             "h1":h1,
             "h2":h2,
@@ -115,4 +127,41 @@ def parse_html(html_txt,base_url,key_word):
             "keyword_in_meta_description":keyword_in_meta_description,
             "keyword_density":keyword_density,
             "keyword_in_h2_h3":keyword_in_h2_h3,
+            "is_mobile_friendly":is_mobile_friendly,
+            "is_safe":is_safe,
             }
+
+
+def check_technical_files(base_url):
+
+    parsed=urlparse(base_url)
+    base_url=f"{parsed.scheme}://{parsed.netloc}"
+    if base_url.endswith("/"):
+        base_url=base_url[:-1]
+    
+    has_robots=False
+    has_sitemaps=False
+
+    try:
+        robots_url=f"{base_url}/robots.txt"
+
+        response=requests.get(robots_url,timeout=5)
+        if response.status_code==200:
+            has_robots=True
+
+    except:
+        pass
+
+    try:
+        sitemaps_url=f"{base_url}/sitemap.xml"
+        response=requests.get(sitemaps_url,timeout=5)
+
+        if response.status_code==200:
+            has_sitemaps=True
+    except:
+        pass
+
+    return has_robots,has_sitemaps
+
+def
+
