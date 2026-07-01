@@ -6,7 +6,7 @@ load_dotenv()
 
 
 
-def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3,is_mobile_friendly):
+def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
     score=0
 
     #title 7+8=15 or 3+8=11
@@ -94,7 +94,7 @@ def calculate_performance_score(load_time):
         
     return score
 
-#def generate_ai_recommendations(audit):
+def generate_ai_recommendations(audit):
     issues=SEOIssues.objects.filter(url__audit=audit)
 
     list_of_issues=[]
@@ -102,7 +102,7 @@ def calculate_performance_score(load_time):
         return "Good Job, No issues were found on the website"
     
     for issue in issues:
-        list_of_issues.append({issue.issue_type:issue.description})
+        list_of_issues.append(f"{issue.issue_type:issue.description}\n")
     
     print(list_of_issues)
 

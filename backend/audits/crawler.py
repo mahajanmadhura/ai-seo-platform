@@ -6,12 +6,13 @@ import time
 
 def fetch_url(url):
     start_time=time.perf_counter()
-    response=requests.get(url)
+    response=requests.get(url,verify=False)
     end_time=time.perf_counter()
 
     load_time=end_time-start_time
+    redirect_chainlength=len(response.history)
 
-    return response.status_code, response.text, load_time
+    return response.status_code, response.text, load_time, redirect_chainlength
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
@@ -28,7 +29,10 @@ def parse_html(html_txt,base_url,key_word):
     word_count=len(soup.get_text().split(" ")) if soup.get_text() else 0
 
     meta_tag=soup.find("meta",attrs={"name":"description"})
-    meta_content=meta_tag.get("content") if meta_tag else "No meta description"
+    if meta_tag and meta_tag.get("content"):
+        meta_content=meta_tag.get("content") 
+    else:
+        meta_content="No meta description"
 
 
     image_tags=soup.find_all("img")
@@ -99,17 +103,31 @@ def parse_html(html_txt,base_url,key_word):
             if key_word_lower in h2_h3_text:
                 keyword_in_h2_h3 = True
         
-        is_mobile_friendly=False
-        viewport_tag=soup.find("meta", attrs=({"name":"viewport"}))
-        if viewport_tag and viewport_tag.get("content"):
-            is_mobile_friendly=True
+    is_mobile_friendly=False
+    viewport_tag=soup.find("meta", attrs=({"name":"viewport"}))
+    if viewport_tag and viewport_tag.get("content"):
+        is_mobile_friendly=True
 
-        is_safe=False
-        str="https://google.com"
-        if base_url.startswith("https"):
-            is_safe=True
-        
-        
+    is_safe=False
+    if base_url.startswith("https"):
+        is_safe=True
+
+    is_crawlable=True
+    meta_robot_content=soup.find("meta", attrs={"name": "robots"})
+    if meta_robot_content and "noindex" in meta_robot_content.get("content", "").lower():
+        is_crawlable = False
+    
+    is_schema_json=False
+    schema_json=soup.find_all("script",type="application/ld+json")
+    if len(schema_json)>0:
+        is_schema_json=True
+
+    is_hreflang=False
+    hreflang=soup.find_all("link",attrs={"rel":"alternate","hreflang":True})
+    if len(hreflang)>0:
+        is_hreflang=True
+
+
 
     return {"title": title,
             "h1":h1,
@@ -129,6 +147,10 @@ def parse_html(html_txt,base_url,key_word):
             "keyword_in_h2_h3":keyword_in_h2_h3,
             "is_mobile_friendly":is_mobile_friendly,
             "is_safe":is_safe,
+            "is_crawlable":is_crawlable,
+            "is_schema_json":is_schema_json,
+            "is_hreflang":is_hreflang,
+
             }
 
 
@@ -144,7 +166,6 @@ def check_technical_files(base_url):
 
     try:
         robots_url=f"{base_url}/robots.txt"
-
         response=requests.get(robots_url,timeout=5)
         if response.status_code==200:
             has_robots=True

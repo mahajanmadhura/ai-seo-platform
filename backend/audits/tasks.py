@@ -1,7 +1,8 @@
 from celery import shared_task
 from .models import Audit,CrawledPage,SEOIssues
 from .crawler import fetch_url, parse_html, check_technical_files
-from .analysers import calculate_on_page_score,calculate_performance_score #,generate_ai_recommendations
+from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations
+import traceback
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -41,12 +42,10 @@ def run_seo_audit(audit_id):
         visited_urls.add(current_url)
 
         try:
-            
-            status_code,html_text,load_time=fetch_url(current_url)
+            status_code,html_text,load_time,redirect_chainlength=fetch_url(current_url)
             result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
 
             performance_score = calculate_performance_score(load_time)
-
             score = calculate_on_page_score(
                         result_of_parse["title"],
                         result_of_parse["h1"],
@@ -64,8 +63,6 @@ def run_seo_audit(audit_id):
                         result_of_parse["keyword_in_meta_description"],
                         result_of_parse["keyword_density"],
                         result_of_parse["keyword_in_h2_h3"],
-                        result_of_parse["is_mobile_friendly"],
-
                     )
 
             new_page = CrawledPage.objects.create(
@@ -91,7 +88,13 @@ def run_seo_audit(audit_id):
                             keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
                             is_mobile_friendly=result_of_parse["is_mobile_friendly"],
                             is_safe=result_of_parse["is_safe"],
-                            performance_score=performance_score,                        
+                            performance_score=performance_score,        
+                            redirect_chainlength=redirect_chainlength,
+                            is_crawlable=result_of_parse.get("is_crawlable",False),
+                            is_schema_json=result_of_parse.get("is_schema_json",False),
+                            is_hreflang=result_of_parse.get("is_hreflang",False),
+
+
                         )
 
             if result_of_parse["h1"]=="No h1 tags found":
@@ -178,6 +181,40 @@ def run_seo_audit(audit_id):
                     description=f"Slow page load time ({load_time}s) on {current_url}. Target is < 2.5s."
                 )
 
+            if status_code==404:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"Status code 404 on {current_url}",
+                )
+
+            if redirect_chainlength>2:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The page redirected {redirect_chainlength} number of times on {current_url}",
+                )
+
+            if not result_of_parse["is_crawlable"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website isnt crawlable at as it is missing robots {current_url}",
+                )
+            
+            if not result_of_parse["is_schema_json"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"There are no Schema Json tags on the website at {current_url}",
+                )
+            if not result_of_parse["is_hreflang"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website doesnt have hreflang tags at {current_url}",
+                )
+
 
             
             for new_link in result_of_parse["links"]:
@@ -185,16 +222,17 @@ def run_seo_audit(audit_id):
                     urls_to_visit.append(new_link)
         except Exception as e:
             print(f"Audit failed, Error: {e}")
+            traceback.print_exc()
         
     
 
-    # if len(visited_urls)>0:
-    #     ai_response=generate_ai_recommendations(audit_website)
-    #     audit_website.ai_recommendation=ai_response
-    #     audit_website.status="DONE"
+    if len(visited_urls)>0:
+        ai_response=generate_ai_recommendations(audit_website)
+        audit_website.ai_recommendation=ai_response
+        audit_website.status="DONE"
 
-    # else:
-    #     audit_website.status="FAILED"
+    else:
+        audit_website.status="FAILED"
 
     
     audit_website.save()

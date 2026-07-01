@@ -45,6 +45,11 @@ class CrawledPage(models.Model):
     is_mobile_friendly=models.BooleanField(default=False)
     is_safe=models.BooleanField(default=False)
     performance_score=models.IntegerField(null=True, blank=True)
+    redirect_chainlength=models.IntegerField(default=0)
+    status_code404=models.BooleanField(default=False)
+    is_crawlable=models.BooleanField(default=False)
+    is_schema_json=models.BooleanField(default=False)
+    is_hreflang=models.BooleanField(default=False)
     
     
 
