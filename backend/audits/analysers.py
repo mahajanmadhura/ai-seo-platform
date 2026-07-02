@@ -6,7 +6,7 @@ load_dotenv()
 
 
 
-def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
+def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,internal_links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
     score=0
 
     #title 7+8=15 or 3+8=11
@@ -59,7 +59,7 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
     else:
         score+=4
     internal_link_count=0
-    for link in links:
+    for link in internal_links:
         if current_url in link:
             internal_link_count += 1
     
@@ -102,9 +102,10 @@ def generate_ai_recommendations(audit):
         return "Good Job, No issues were found on the website"
     
     for issue in issues:
-        list_of_issues.append(f"{issue.issue_type:issue.description}\n")
+        list_of_issues.append(f"{issue.issue_type}: {issue.description} \n")
     
-    print(list_of_issues)
+    for issue in list_of_issues:
+        print(issue)
 
     client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
@@ -131,5 +132,18 @@ def generate_ai_recommendations(audit):
     return chat_completion.choices[0].message.content
 
 
+def performance_analysis(lcp,fid,cls,ttfb,fcp):
+    score=0
+    if lcp>2.5:
+        score+=25
+    if fid<100:
+        score+=25
+    if cls<0.1:
+        score+=20
+    if ttfb<200:
+        score+=15
+    if fcp<1.8:
+        score+=15
 
+    return score
 

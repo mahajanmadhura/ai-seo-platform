@@ -1,8 +1,9 @@
-import requests
+import requests, time, os
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin,urlparse
-import time
-
+import traceback
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def fetch_url(url):
     start_time=time.perf_counter()
@@ -49,13 +50,27 @@ def parse_html(html_txt,base_url,key_word):
                                              "alt":image_tag.get("alt")})
     
     anchor_tags=soup.find_all("a")
-    links=[]
+    internal_links=[]
+    external_links=[]
+    broken_links=[]
     if len(anchor_tags)!=0:
         for anchor_tag in anchor_tags:
             href=anchor_tag.get("href")
             if href:
                 full_link=urljoin(base_url,href)
-                links.append(full_link)
+                
+                if urlparse(base_url).netloc in full_link:
+                    internal_links.append(full_link)
+                else:
+                    external_links.append(full_link)
+                
+                if len(broken_links)<10:
+                    try:
+                        status_code=requests.head(full_link,timeout=2,verify=False).status_code
+                        if status_code>=400:
+                            broken_links.append(full_link)
+                    except:
+                        broken_links.append(full_link)
             else:
                 continue
 
@@ -128,13 +143,14 @@ def parse_html(html_txt,base_url,key_word):
         is_hreflang=True
 
 
-
     return {"title": title,
             "h1":h1,
             "h2":h2,
             "h3":h3,
             "word_count":word_count,
-            "links":links,
+            "internal_links":internal_links,
+            "external_links_count":len(external_links),
+            "broken_links_count":len(broken_links),
             "meta_description":meta_content,
             "img_without_alt_tags":img_without_alt_tags,
             "canonical_tag_check":canonical_tag_check,
@@ -185,3 +201,61 @@ def check_technical_files(base_url):
     return has_robots,has_sitemaps
 
 
+def fetch_core_web_vitals(url):
+    api_url=f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&strategy=mobile"
+    api_key=os.environ.get("PAGESPEED_API_KEY")
+    if api_key:
+        api_url+=f"&key={api_key}"
+
+    try:
+        response = requests.get(api_url, timeout=30)
+        data = response.json()
+        
+        # 1. Safely drill down to the "audits" folder. If anything is missing, return an empty dict {}
+        audits = data.get("lighthouseResult", {}).get("audits", {})
+        
+        # 2. Safely grab the LCP numericValue. If it's missing, default to 0!
+        lcp_raw = audits.get("largest-contentful-paint", {}).get("numericValue", 0)
+        cls_raw = audits.get("cumulative-layout-shift", {}).get("numericValue", 0)
+        fcp_raw = audits.get("first-contentful-paint", {}).get("numericValue", 0)
+        ttfb_raw = audits.get("server_response_time",{}).get("numericValue",0)
+        fid_raw = audits.get("total-blocking-time",{}).get("numericValue",0)
+
+        font_score = audits.get("font_size",{}).get("numericValue",0)
+        tap_score = audits.get("tap_targets",{}).get("numericValue",0)
+
+        return {
+            "lcp": round(lcp_raw / 1000, 2), # Convert ms to s, and round to 2 decimals
+            "cls": round(cls_raw, 3),        # CLS doesn't need conversion, just rounding
+            "fcp": round(fcp_raw / 1000, 2),
+            "ttfb": round(ttfb_raw,3),
+            "fid":round(fid_raw,3),
+            "mobile_font_readability":font_score>=0.9,
+            "mobile_tap_targets":tap_score>=0.9,
+
+        }
+    # try:
+    #     response=requests.get(api_url,timeout=30)
+    #     data=response.json()
+    #     lcp=data["lighthouseResult"]["audits"]["largest-contentful-paint"]["numericValue"]/1000 if data["lighthouseResult"]["audits"]["largest-contentful-paint"]["numericValue"] else 0
+    #     cls=data["lighthouseResult"]["audits"]["cumulative-layout-shift"]["numericValue"]
+    #     fcp=data["lighthouseResult"]["audits"]["first-contentful-paint"]["numericValue"]/1000 if data["lighthouseResult"]["audits"]["first-contentful-paint"]["numericValue"] else 0
+        
+    #     return {
+    #         "lcp":lcp,
+    #        "cls":cls,
+    #         "fcp":fcp,
+    #     }
+
+    except Exception as e:
+        print("Couldnt fetch core vitals with error",e)
+        traceback.print_exc()
+        return {
+            "lcp":0.00,
+            "cls":0.000,
+            "fcp":0.00,
+            "ttfb":0.00,
+            "fid":0.00,
+            "mobile_font_readability":False,
+            "mobile_tap_targets":False,
+        }

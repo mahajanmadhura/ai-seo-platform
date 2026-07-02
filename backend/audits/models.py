@@ -50,8 +50,16 @@ class CrawledPage(models.Model):
     is_crawlable=models.BooleanField(default=False)
     is_schema_json=models.BooleanField(default=False)
     is_hreflang=models.BooleanField(default=False)
-    
-    
+    external_links_count=models.IntegerField(default=0)
+    broken_links_count=models.IntegerField(default=0)
+    largest_contentful_paint=models.FloatField(default=0.00)
+    cumulative_layout_shift=models.FloatField(default=0.000)
+    first_contentful_paint=models.FloatField(default=0.00)
+    time_to_first_byte=models.FloatField(default=0.000)
+    first_input_delay=models.FloatField(default=0.00)
+    core_web_vitals_performance_score=models.IntegerField(default=0)
+    mobile_font_readability=models.BooleanField(default=False)
+    mobile_tap_targets=models.BooleanField(default=False)
 
 class SEOIssues(models.Model):
     issue_choices=[
