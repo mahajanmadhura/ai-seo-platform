@@ -134,7 +134,7 @@ def generate_ai_recommendations(audit):
 
 def performance_analysis(lcp,fid,cls,ttfb,fcp):
     score=0
-    if lcp>2.5:
+    if lcp<2.5:
         score+=25
     if fid<100:
         score+=25

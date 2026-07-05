@@ -60,6 +60,11 @@ class CrawledPage(models.Model):
     core_web_vitals_performance_score=models.IntegerField(default=0)
     mobile_font_readability=models.BooleanField(default=False)
     mobile_tap_targets=models.BooleanField(default=False)
+    has_mobile_viewport_configuration=models.BooleanField(default=False)
+    has_valid_SSL=models.BooleanField(default=False)
+    has_strict_transport_security=models.BooleanField(default=False)
+    has_content_security_policy=models.BooleanField(default=False)
+    has_x_frame_options=models.BooleanField(default=False)
 
 class SEOIssues(models.Model):
     issue_choices=[

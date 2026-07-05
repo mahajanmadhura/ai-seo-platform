@@ -42,11 +42,12 @@ def run_seo_audit(audit_id):
         visited_urls.add(current_url)
         
         try:
-            status_code,html_text,load_time,redirect_chainlength=fetch_url(current_url)
+            status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options=fetch_url(current_url)
             result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
-            core_web_vitals=fetch_core_web_vitals(current_url)
             performance_score = calculate_performance_score(load_time)
-            core_web_vitals_performance_score=performance_analysis(core_web_vitals["lcp"],core_web_vitals["fid"],core_web_vitals["cls"],core_web_vitals["ttfb"],core_web_vitals["fcp"])
+
+            
+            
             score = calculate_on_page_score(
                         result_of_parse["title"],
                         result_of_parse["h1"],
@@ -96,17 +97,15 @@ def run_seo_audit(audit_id):
                             is_hreflang=result_of_parse.get("is_hreflang",False),
                             external_links_count=result_of_parse["external_links_count"],
                             broken_links_count=result_of_parse["broken_links_count"],
-                            largest_contentful_paint=core_web_vitals["lcp"],
-                            cumulative_layout_shift=core_web_vitals["cls"],
-                            first_contentful_paint=core_web_vitals["fcp"],
-                            time_to_first_byte=core_web_vitals["ttfb"],
-                            first_input_delay=core_web_vitals["fid"],
-                            core_web_vitals_performance_score=core_web_vitals_performance_score,
-                            mobile_font_readability=core_web_vitals["mobile_font_readability"],
-                            mobile_tap_targets=core_web_vitals["mobile_tap_targets"],
-
+                            has_mobile_viewport_configuration=result_of_parse["has_mobile_viewport_configuration"],
+                            has_valid_SSL=has_valid_SSL,
+                            has_strict_transport_security=has_strict_transport_security,
+                            has_content_security_policy=has_content_security_policy,
+                            has_x_frame_options=has_x_frame_options,
 
                         )
+
+            core_web_vitals_analsysis.delay(new_page.id)
 
             if result_of_parse["h1"]=="No h1 tags found":
                 SEOIssues.objects.create(
@@ -226,53 +225,41 @@ def run_seo_audit(audit_id):
                     description=f"The website doesnt have hreflang tags at {current_url}",
                 )
             
-            if core_web_vitals["lcp"]>2.5:
+            if not result_of_parse["has_mobile_viewport_configuration"]:
                 SEOIssues.objects.create(
                     url=new_page,
                     issue_type="WARNING",
-                    description=f"Largest Contentful Paint took {core_web_vitals["lcp"]}s to load on {current_url}"
-                )
-            if core_web_vitals["fid"]>100:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"First Input Dealy took {core_web_vitals["fid"]}ms to load on {current_url}"
-                )
-            if core_web_vitals["cls"]>0.1:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"Cumulative layout shift is {core_web_vitals["cls"]} on {current_url}"
-                )
-            if core_web_vitals["ttfb"]>200:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"Time to First Byte took {core_web_vitals["cls"]}ms to load on {current_url}"
-                )
-            if core_web_vitals["fcp"]>1.8:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"First Contentful Paint took {core_web_vitals["cls"]}s to load on {current_url}"
-                )
-
-            if not core_web_vitals["mobile_font_readability"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"Text is too small to read on mobile devices on {current_url}"
+                    description=f"The website doesnt have proper mobile viewport configuration at {current_url}",
                 )
             
-            if not core_web_vitals["mobile_tap_targets"]:
+            if not has_valid_SSL:
                 SEOIssues.objects.create(
                     url=new_page,
-                    issue_type="WARNING",
-                    description=f"Buttons/Links are too close together for mobile tapping on {current_url}"
+                    issue_type="ERROR",
+                    description=f"The website doesnt have a valid SSL certificate at {current_url}",
                 )
 
+            if not has_strict_transport_security:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website doesnt have strict transport security at {current_url}",
+                )
 
-            
+            if not has_content_security_policy:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website doesnt have a content security policy at {current_url}",
+                )
+
+            if not has_x_frame_options:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="ERROR",
+                    description=f"The website doesnt have a X frame options at {current_url}",
+                )
+
             for new_link in result_of_parse["internal_links"]:
                 if new_link not in urls_to_visit:
                     urls_to_visit.append(new_link)
@@ -296,3 +283,71 @@ def run_seo_audit(audit_id):
     return f"Audit Complete! Crawled through {len(visited_urls)} pages"
 
         
+@shared_task
+def core_web_vitals_analsysis(audit_id):
+    page=CrawledPage.objects.get(id=audit_id)
+    current_url=page.url
+    core_web_vitals=fetch_core_web_vitals(current_url)
+    core_web_vitals_performance_score=performance_analysis(
+        core_web_vitals["lcp"],
+        core_web_vitals["fid"],
+        core_web_vitals["cls"],
+        core_web_vitals["ttfb"],
+        core_web_vitals["fcp"]
+    )
+
+    page.largest_contentful_paint=core_web_vitals["lcp"]
+    page.first_input_delay=core_web_vitals["fid"]
+    page.cumulative_layout_shift=core_web_vitals["cls"]
+    page.time_to_first_byte=core_web_vitals["ttfb"]
+    page.first_contentful_paint=core_web_vitals["fcp"]
+    page.core_web_vitals_performance_score=core_web_vitals_performance_score
+    
+    page.save()
+    
+    
+
+    if core_web_vitals["lcp"]>2.5:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f'Largest Contentful Paint took {core_web_vitals["lcp"]}s to load on {current_url}'
+        )
+    if core_web_vitals["fid"]>100:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f'First Input Dealy took {core_web_vitals["fid"]}ms to load on {current_url}'
+        )
+    if core_web_vitals["cls"]>0.1:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f'Cumulative layout shift is {core_web_vitals["cls"]} on {current_url}'
+        )
+    if core_web_vitals["ttfb"]>200:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f'Time to First Byte took {core_web_vitals["ttfb"]}ms to load on {current_url}'
+        )
+    if core_web_vitals["fcp"]>1.8:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f'First Contentful Paint took {core_web_vitals["fcp"]}s to load on {current_url}'
+        )
+
+    if not core_web_vitals["mobile_font_readability"]:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f"Text is too small to read on mobile devices on {current_url}"
+        )
+    
+    if not core_web_vitals["mobile_tap_targets"]:
+        SEOIssues.objects.create(
+            url=page,
+            issue_type="WARNING",
+            description=f"Buttons/Links are too close together for mobile tapping on {current_url}"
+        )

@@ -13,7 +13,27 @@ def fetch_url(url):
     load_time=end_time-start_time
     redirect_chainlength=len(response.history)
 
-    return response.status_code, response.text, load_time, redirect_chainlength
+    has_valid_SSL=True
+    try:
+        SSL_response=requests.head(url)
+    except requests.exceptions.SSLError:
+        has_valid_SSL=False
+
+    has_strict_transport_security=False                   #HSTS
+    if "Strict-Transport-Security" in response.headers:
+        has_strict_transport_security=True
+    
+    has_content_security_policy=False                    #CSP
+    if "Content-Security-Policy" in response.headers:
+        has_content_security_policy=True
+
+    has_x_frame_options=False                            #X-Frame_Options
+    if "X-Frame-Options" in response.headers:
+        has_x_frame_options=True
+
+
+
+    return response.status_code, response.text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
@@ -37,18 +57,31 @@ def parse_html(html_txt,base_url,key_word):
 
 
     image_tags=soup.find_all("img")
+
+
     img_without_alt_tags=[]
+
+    has_mixed_content=False
 
     if len(image_tags)!=0:
         for image_tag in image_tags:
+            raw_src=image_tag.get("src")
+            full_src=urljoin(base_url,raw_src)
+
+            if not has_mixed_content:
+                parsed_src=urlparse(full_src).scheme
+
+                if parsed_src!="https":
+                    has_mixed_content=True
+            
             if image_tag.get("alt"):
                 continue
             else:
-                raw_src=image_tag.get("src")
-                full_src=urljoin(base_url,raw_src)
+                
                 img_without_alt_tags.append({"src":full_src,
                                              "alt":image_tag.get("alt")})
     
+
     anchor_tags=soup.find_all("a")
     internal_links=[]
     external_links=[]
@@ -119,9 +152,15 @@ def parse_html(html_txt,base_url,key_word):
                 keyword_in_h2_h3 = True
         
     is_mobile_friendly=False
+    has_mobile_viewport_configuration=False
     viewport_tag=soup.find("meta", attrs=({"name":"viewport"}))
     if viewport_tag and viewport_tag.get("content"):
         is_mobile_friendly=True
+        
+        current_string=viewport_tag.get("content").lower()
+        if "width=device-width" in current_string and "initial-scale=1" in current_string:
+            has_mobile_viewport_configuration=True
+
 
     is_safe=False
     if base_url.startswith("https"):
@@ -166,6 +205,7 @@ def parse_html(html_txt,base_url,key_word):
             "is_crawlable":is_crawlable,
             "is_schema_json":is_schema_json,
             "is_hreflang":is_hreflang,
+            "has_mobile_viewport_configuration":has_mobile_viewport_configuration,
 
             }
 
@@ -221,8 +261,10 @@ def fetch_core_web_vitals(url):
         ttfb_raw = audits.get("server_response_time",{}).get("numericValue",0)
         fid_raw = audits.get("total-blocking-time",{}).get("numericValue",0)
 
+        #Mobile SEO analysis
         font_score = audits.get("font_size",{}).get("numericValue",0)
         tap_score = audits.get("tap_targets",{}).get("numericValue",0)
+        mobile_viewport_configuration=audits.get("",{})
 
         return {
             "lcp": round(lcp_raw / 1000, 2), # Convert ms to s, and round to 2 decimals
