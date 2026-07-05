@@ -65,6 +65,7 @@ class CrawledPage(models.Model):
     has_strict_transport_security=models.BooleanField(default=False)
     has_content_security_policy=models.BooleanField(default=False)
     has_x_frame_options=models.BooleanField(default=False)
+    has_mixed_content=models.BooleanField(default=False)
 
 class SEOIssues(models.Model):
     issue_choices=[

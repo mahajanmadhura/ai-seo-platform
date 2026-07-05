@@ -2,6 +2,7 @@ from groq import Groq
 import os
 from dotenv import load_dotenv
 from .models import Audit,CrawledPage,SEOIssues
+from django.db.models import Q
 load_dotenv()
 
 
@@ -58,16 +59,10 @@ def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description
         score+=8
     else:
         score+=4
-    internal_link_count=0
-    for link in internal_links:
-        if current_url in link:
-            internal_link_count += 1
     
-    if internal_link_count > 0:
+    if len(internal_links)> 0:
         score += 12
     
-    
-
     if 1.0<keyword_density<3.0:
         score+=12
     elif keyword_density>3.0:
@@ -95,14 +90,20 @@ def calculate_performance_score(load_time):
     return score
 
 def generate_ai_recommendations(audit):
-    issues=SEOIssues.objects.filter(url__audit=audit)
+    issues=SEOIssues.objects.filter(Q(audit=audit) | Q(url__audit=audit))
 
     list_of_issues=[]
     if not issues:
         return "Good Job, No issues were found on the website"
     
+    unique_issues = set()
     for issue in issues:
-        list_of_issues.append(f"{issue.issue_type}: {issue.description} \n")
+        # We strip the specific URL out so the AI just sees the core issue
+        # e.g., "ERROR: Missing h1 tag"
+        base_issue = issue.description.split(" on http")[0] 
+        unique_issues.add(f"{issue.issue_type}: {base_issue}")
+    
+    list_of_issues = list(unique_issues)
     
     for issue in list_of_issues:
         print(issue)

@@ -4,6 +4,7 @@ from urllib.parse import urljoin,urlparse
 import traceback
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import re
 
 def fetch_url(url):
     start_time=time.perf_counter()
@@ -15,8 +16,8 @@ def fetch_url(url):
 
     has_valid_SSL=True
     try:
-        SSL_response=requests.head(url)
-    except requests.exceptions.SSLError:
+        SSL_response=requests.head(url,timeout=10)
+    except requests.exceptions.RequestException:
         has_valid_SSL=False
 
     has_strict_transport_security=False                   #HSTS
@@ -65,7 +66,7 @@ def parse_html(html_txt,base_url,key_word):
 
     if len(image_tags)!=0:
         for image_tag in image_tags:
-            raw_src=image_tag.get("src")
+            raw_src=image_tag.get("src") if image_tag.get("src") else ""
             full_src=urljoin(base_url,raw_src)
 
             if not has_mixed_content:
@@ -80,6 +81,25 @@ def parse_html(html_txt,base_url,key_word):
                 
                 img_without_alt_tags.append({"src":full_src,
                                              "alt":image_tag.get("alt")})
+                
+    if not has_mixed_content:
+        all_scripts = soup.find_all("script")
+        url_pattern = r"http://[^\s'\"]+"
+
+        for script in all_scripts:
+            # 1. Check the inline text of the script
+            script_text = script.text
+            if script_text and re.search(url_pattern, script_text):
+                has_mixed_content = True
+                break  # Exit loop early since we found what we were looking for
+
+            # 2. Check the 'src' attribute of the script
+            script_src = script.get("src")
+            if script_src: # This cleanly handles None or empty strings ("")
+                if re.match(url_pattern, script_src):
+                    has_mixed_content = True
+                    break  # Exit loop early
+
     
 
     anchor_tags=soup.find_all("a")
@@ -92,7 +112,7 @@ def parse_html(html_txt,base_url,key_word):
             if href:
                 full_link=urljoin(base_url,href)
                 
-                if urlparse(base_url).netloc in full_link:
+                if urlparse(base_url).netloc==urlparse(full_link).netloc:
                     internal_links.append(full_link)
                 else:
                     external_links.append(full_link)
@@ -177,7 +197,7 @@ def parse_html(html_txt,base_url,key_word):
         is_schema_json=True
 
     is_hreflang=False
-    hreflang=soup.find_all("link",attrs={"rel":"alternate","hreflang":True})
+    hreflang=soup.find_all("link",attrs={"rel":"alternate", "hreflang":True})
     if len(hreflang)>0:
         is_hreflang=True
 
@@ -206,6 +226,7 @@ def parse_html(html_txt,base_url,key_word):
             "is_schema_json":is_schema_json,
             "is_hreflang":is_hreflang,
             "has_mobile_viewport_configuration":has_mobile_viewport_configuration,
+            "has_mixed_content":has_mixed_content
 
             }
 
@@ -258,12 +279,12 @@ def fetch_core_web_vitals(url):
         lcp_raw = audits.get("largest-contentful-paint", {}).get("numericValue", 0)
         cls_raw = audits.get("cumulative-layout-shift", {}).get("numericValue", 0)
         fcp_raw = audits.get("first-contentful-paint", {}).get("numericValue", 0)
-        ttfb_raw = audits.get("server_response_time",{}).get("numericValue",0)
+        ttfb_raw = audits.get("server-response-time",{}).get("numericValue",0)
         fid_raw = audits.get("total-blocking-time",{}).get("numericValue",0)
 
         #Mobile SEO analysis
-        font_score = audits.get("font_size",{}).get("numericValue",0)
-        tap_score = audits.get("tap_targets",{}).get("numericValue",0)
+        font_score = audits.get("font-size",{}).get("numericValue",0)
+        tap_score = audits.get("tap-targets",{}).get("numericValue",0)
         mobile_viewport_configuration=audits.get("",{})
 
         return {
@@ -276,18 +297,6 @@ def fetch_core_web_vitals(url):
             "mobile_tap_targets":tap_score>=0.9,
 
         }
-    # try:
-    #     response=requests.get(api_url,timeout=30)
-    #     data=response.json()
-    #     lcp=data["lighthouseResult"]["audits"]["largest-contentful-paint"]["numericValue"]/1000 if data["lighthouseResult"]["audits"]["largest-contentful-paint"]["numericValue"] else 0
-    #     cls=data["lighthouseResult"]["audits"]["cumulative-layout-shift"]["numericValue"]
-    #     fcp=data["lighthouseResult"]["audits"]["first-contentful-paint"]["numericValue"]/1000 if data["lighthouseResult"]["audits"]["first-contentful-paint"]["numericValue"] else 0
-        
-    #     return {
-    #         "lcp":lcp,
-    #        "cls":cls,
-    #         "fcp":fcp,
-    #     }
 
     except Exception as e:
         print("Couldnt fetch core vitals with error",e)

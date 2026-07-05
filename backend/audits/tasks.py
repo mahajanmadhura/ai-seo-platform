@@ -3,6 +3,7 @@ from .models import Audit,CrawledPage,SEOIssues
 from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis
 import traceback
+from django.utils import timezone
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -102,10 +103,11 @@ def run_seo_audit(audit_id):
                             has_strict_transport_security=has_strict_transport_security,
                             has_content_security_policy=has_content_security_policy,
                             has_x_frame_options=has_x_frame_options,
+                            has_mixed_content=result_of_parse["has_mixed_content"],
 
                         )
 
-            core_web_vitals_analsysis.delay(new_page.id)
+            core_web_vitals_analysis.delay(new_page.id)
 
             if result_of_parse["h1"]=="No h1 tags found":
                 SEOIssues.objects.create(
@@ -260,6 +262,13 @@ def run_seo_audit(audit_id):
                     description=f"The website doesnt have a X frame options at {current_url}",
                 )
 
+            if result_of_parse["has_mixed_content"]:
+                SEOIssues.objects.create(
+                    url=new_page,
+                    issue_type="WARNING",
+                    description=f"The website has mixed content (HTTPS pages loading HTTP resources) at {current_url}",
+                )
+
             for new_link in result_of_parse["internal_links"]:
                 if new_link not in urls_to_visit:
                     urls_to_visit.append(new_link)
@@ -272,6 +281,9 @@ def run_seo_audit(audit_id):
     if len(visited_urls)>0:
         ai_response=generate_ai_recommendations(audit_website)
         audit_website.ai_recommendation=ai_response
+        audit_website.completed_at = timezone.now()
+        audit_website.total_pages = len(visited_urls)
+        audit_website.total_issues = SEOIssues.objects.filter(models.Q(audit=audit_website) | models.Q(url__audit=audit_website)).count()
         audit_website.status="DONE"
 
     else:
@@ -284,8 +296,8 @@ def run_seo_audit(audit_id):
 
         
 @shared_task
-def core_web_vitals_analsysis(audit_id):
-    page=CrawledPage.objects.get(id=audit_id)
+def core_web_vitals_analysis(page_id):
+    page=CrawledPage.objects.get(id=page_id)
     current_url=page.url
     core_web_vitals=fetch_core_web_vitals(current_url)
     core_web_vitals_performance_score=performance_analysis(
