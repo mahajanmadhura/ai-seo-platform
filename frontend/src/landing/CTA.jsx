@@ -41,19 +41,19 @@ const CTA = () => {
               id="run-audit-cta-btn"
               className="w-full sm:w-auto bg-growth-green text-deep-green px-8 py-4 rounded-full font-black uppercase tracking-wider text-xs hover:bg-growth-green/90 hover:scale-105 active:scale-95 transition-all duration-200 shadow-md cursor-pointer flex items-center justify-center gap-2"
             >
-              <Search className="w-4 h-4" /> Run Your First Audit
+              <Search className="w-4 h-4" /> Create Workspace
             </button>
             <button
               onClick={() => navigate('/register')}
               id="create-account-cta-btn"
               className="w-full sm:w-auto bg-transparent border border-white/20 text-white px-8 py-4 rounded-full font-black uppercase tracking-wider text-xs hover:bg-white/5 hover:border-white/45 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
             >
-              <UserPlus className="w-4 h-4" /> Create Free Account
+              <UserPlus className="w-4 h-4" /> Create Free Workspace
             </button>
           </div>
 
           <p className="text-[10px] text-muted-text font-black uppercase tracking-[0.25em] pt-4">
-            No credit card required • Instant results
+            Free workspace setup • Credits required for audits
           </p>
         </div>
 

@@ -15,10 +15,9 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
 colorama==0.4.6
 distro==1.9.0
-Django==6.0.6
-django-channels==0.7.0
+Django>=5.0,<6.0
 django_celery_results==2.6.0
-razorpay==1.5.1
+razorpay==2.0.1
 python-decouple==3.8
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
@@ -53,3 +52,4 @@ urllib3==2.7.0
 vine==5.1.0
 wcwidth==0.8.1
 django-cors-headers==4.7.0
+psycopg2-binary==2.9.9

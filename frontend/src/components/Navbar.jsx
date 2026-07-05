@@ -12,7 +12,7 @@ const Navbar = () => {
   const handleLogout = async () => {
     setIsOpen(false);
     await logoutUser();
-    navigate('/');
+    navigate('/login');
   };
 
   const handleScrollToSection = (e, id) => {
@@ -101,7 +101,7 @@ const Navbar = () => {
                 id="cta-run-audit-nav"
                 className="bg-deep-green text-white px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wider hover:bg-forest-green hover:scale-[1.03] active:scale-[0.98] transition-all duration-200 shadow-[0_4px_14px_rgba(5,61,52,0.12)] cursor-pointer"
               >
-                Run Free Audit
+                Start SEO Audit
               </button>
             </>
           )}
@@ -205,7 +205,7 @@ const Navbar = () => {
                       }}
                       className="bg-deep-green text-white px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wider hover:bg-forest-green hover:scale-105 transition-all duration-200 shadow-md cursor-pointer"
                     >
-                      Run Free Audit
+                      Start SEO Audit
                     </button>
                   </div>
                 )}

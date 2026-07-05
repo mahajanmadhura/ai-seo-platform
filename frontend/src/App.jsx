@@ -11,7 +11,6 @@ import Register from './pages/auth/Register';
 import VerifyEmail from './pages/auth/VerifyEmail';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
-import ChangePassword from './pages/dashboard/ChangePassword';
 import Settings from './pages/dashboard/Settings';
 import Dashboard from './pages/dashboard/Dashboard';
 import WebsiteList from './pages/dashboard/WebsiteList';
@@ -54,14 +53,6 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route
-              path="/change-password"
-              element={
-                <ProtectedRoute>
-                  <ChangePassword />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/settings"
               element={
                 <ProtectedRoute>
@@ -69,14 +60,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/profile" element={<Navigate to="/settings?tab=profile" replace />} />
+            <Route path="/billing" element={<Navigate to="/settings?tab=billing" replace />} />
+            <Route path="/credits" element={<Navigate to="/settings?tab=billing" replace />} />
+            <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
+            <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />
             <Route
               path="/dashboard"
               element={

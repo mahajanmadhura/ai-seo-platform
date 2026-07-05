@@ -89,24 +89,24 @@ class ConfirmPaymentView(APIView):
 
 
 class DeductCreditView(APIView):
-    """Audit start karte waqt 1 credit katne ke liye internal use"""
+    """Audit start karte waqt 5 credits katne ke liye internal use"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         credit_account, created = UserCredit.objects.get_or_create(user=request.user)
 
-        if credit_account.balance < 1:
+        if credit_account.balance < 5:
             return Response({'error': 'Insufficient credits'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            credit_account.balance -= 1
+            credit_account.balance -= 5
             credit_account.save()
 
             CreditTransaction.objects.create(
                 user=request.user,
-                amount=-1,
+                amount=-5,
                 transaction_type='audit_deduction',
-                description='1 credit deducted for audit',
+                description='5 credits deducted for audit',
             )
 
         return Response({'message': 'Credit deducted', 'balance': credit_account.balance})
@@ -203,6 +203,19 @@ from .models import APIKey
 
 class GenerateAPIKeyView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            api_key = APIKey.objects.get(user=request.user)
+            return Response({
+                'api_key': api_key.key,
+                'message': 'API key fetched successfully'
+            })
+        except APIKey.DoesNotExist:
+            return Response({
+                'api_key': None,
+                'message': 'No API key found'
+            })
 
     def post(self, request):
         api_key, created = APIKey.objects.get_or_create(user=request.user)

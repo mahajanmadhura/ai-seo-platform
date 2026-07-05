@@ -14,17 +14,23 @@ import {
   ChevronLeft,
   Plus,
   User,
-  Shield
+  Shield,
+  CreditCard
 } from 'lucide-react';
 import LogoWhite from '../../assets/White.png';
 import AddWebsiteModal from '../AddWebsiteModal';
+import DashboardFooter from '../footer/DashboardFooter';
 
 export default function DashboardLayout({ children, title, cta, backLink }) {
-  const { user, logoutUser } = useAuth();
+  const { user, logoutUser, credits, refreshCredits } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    refreshCredits();
+  }, [location.pathname]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -43,14 +49,12 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
 
   const handleLogout = async () => {
     await logoutUser();
-    navigate('/');
+    navigate('/login');
   };
 
-  const navItems = [
+  const coreNavItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, enabled: true },
     { name: 'Websites', path: '/websites', icon: Globe, enabled: true },
-    { name: 'Profile', path: '/settings', icon: User, enabled: true },
-    { name: 'Security', path: '/change-password', icon: Shield, enabled: true },
     { name: 'Audits', path: '#', icon: Search, enabled: false, badge: 'Soon' },
     { name: 'Reports', path: '#', icon: FileText, enabled: false, badge: 'Soon' },
   ];
@@ -71,7 +75,7 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full bg-[#0A4B43] text-left text-[#E5F3EC]">
       <div className="p-6 border-b border-[#083D36]">
-        <Link to="/dashboard" className="flex items-center group">
+        <Link to="/dashboard" className="block group">
           <img
             src={LogoWhite}
             alt="Athenura"
@@ -81,7 +85,7 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
       </div>
 
       <nav className="flex-grow p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {coreNavItems.map((item) => {
           const active = isPathActive(item.path);
           const Icon = item.icon;
 
@@ -109,11 +113,10 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
               key={item.name}
               to={item.path}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all relative ${
-                active
-                  ? 'bg-[#083D36] text-white shadow-sm border-l-4 border-[#36E682] pl-3'
-                  : 'text-[#E5F3EC]/70 hover:text-white hover:bg-[#083D36]/40'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all relative ${active
+                ? 'bg-[#083D36] text-white shadow-sm'
+                : 'text-[#E5F3EC]/70 hover:text-white hover:bg-[#083D36]/40'
+                }`}
             >
               <Icon className="w-4 h-4" />
               <span>{item.name}</span>
@@ -122,7 +125,18 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-[#083D36]">
+      <div className="p-4 border-t border-[#083D36] space-y-1">
+        <Link
+          to="/settings"
+          onClick={() => setMobileOpen(false)}
+          className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all relative ${isPathActive('/settings')
+            ? 'bg-[#083D36] text-white shadow-sm'
+            : 'text-[#E5F3EC]/70 hover:text-white hover:bg-[#083D36]/40'
+            }`}
+        >
+          <SettingsIcon className="w-4 h-4" />
+          <span>Settings</span>
+        </Link>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold text-red-300 hover:bg-[#083D36] hover:text-white transition-all cursor-pointer text-left"
@@ -164,18 +178,15 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
           </div>
 
           <div className="flex items-center gap-3.5">
-            <div className="hidden sm:flex items-center gap-1.5 bg-[#E5F3EC] border border-deep-green/10 text-[#053D34] px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-[#36E682]" />
-              <span>Unlimited Credits</span>
-            </div>
-
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="hidden sm:inline-flex items-center gap-1.5 bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] px-4 py-2 rounded-xl text-[11px] font-black transition-all shadow-md cursor-pointer"
+            <Link
+              to="/settings?tab=billing"
+              className="flex items-center gap-1.5 bg-[#E5F3EC] border border-deep-green/10 text-[#053D34] px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm hover:bg-[#36E682] hover:text-[#053D34] transition-all group"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Website</span>
-            </button>
+              <Sparkles className="w-3.5 h-3.5 text-[#36E682] group-hover:text-[#053D34] transition-colors" />
+              <span>{credits ?? 0} Credits</span>
+            </Link>
+
+
 
             <div className="h-6 w-px bg-border-color/60 hidden sm:block"></div>
 
@@ -211,16 +222,11 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
 
         <main className="p-6 md:p-8 space-y-8 flex-grow">
           <div className="sm:hidden mb-2">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] py-3 rounded-xl text-xs font-black transition-all shadow-md cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Website</span>
-            </button>
+
           </div>
           {children}
         </main>
+        <DashboardFooter />
       </div>
 
       <AddWebsiteModal isOpen={isAddModalOpen} onClose={handleCloseModal} />

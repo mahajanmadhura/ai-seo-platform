@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { login, getMe, logout } from '../services/auth';
+import { getCreditBalance } from '../services/payments';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState(null);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -17,6 +19,11 @@ export const AuthProvider = ({ children }) => {
           if (res?.success && res?.data) {
             setUser(res.data);
             setIsAuthenticated(true);
+
+            const balanceRes = await getCreditBalance();
+            if (balanceRes.success && balanceRes.data) {
+              setCredits(balanceRes.data.balance);
+            }
           } else {
             handleLocalLogout();
           }
@@ -72,12 +79,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshCredits = async () => {
+    try {
+      const balanceRes = await getCreditBalance();
+      if (balanceRes.success && balanceRes.data) {
+        setCredits(balanceRes.data.balance);
+      }
+    } catch (error) {
+      // Profile sync error
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated,
         loading,
+        credits,
+        refreshCredits,
         loginUser,
         logoutUser,
         refreshUserProfile,
