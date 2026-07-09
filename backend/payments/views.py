@@ -93,23 +93,26 @@ class DeductCreditView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        credit_account, created = UserCredit.objects.get_or_create(user=request.user)
+        try:
+            with transaction.atomic():
+                credit_account = UserCredit.objects.select_for_update().get_or_create(user=request.user)[0]
 
-        if credit_account.balance < 5:
-            return Response({'error': 'Insufficient credits'}, status=status.HTTP_400_BAD_REQUEST)
+                if credit_account.balance < 5:
+                    return Response({'error': 'Insufficient credits'}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            credit_account.balance -= 5
-            credit_account.save()
+                credit_account.balance -= 5
+                credit_account.save()
 
-            CreditTransaction.objects.create(
-                user=request.user,
-                amount=-5,
-                transaction_type='audit_deduction',
-                description='5 credits deducted for audit',
-            )
+                CreditTransaction.objects.create(
+                    user=request.user,
+                    amount=-5,
+                    transaction_type='audit_deduction',
+                    description='5 credits deducted for audit',
+                )
 
-        return Response({'message': 'Credit deducted', 'balance': credit_account.balance})
+            return Response({'message': 'Credit deducted', 'balance': credit_account.balance})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CreditTransactionHistoryView(APIView):

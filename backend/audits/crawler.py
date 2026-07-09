@@ -7,34 +7,30 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import re
 
 def fetch_url(url):
-    start_time=time.perf_counter()
-    response=requests.get(url,verify=False)
-    end_time=time.perf_counter()
-
-    load_time=end_time-start_time
-    redirect_chainlength=len(response.history)
-
-    has_valid_SSL=True
+    headers = {"User-Agent": "AthenuraSEOAuditor/1.0"}
+    start_time = time.perf_counter()
     try:
-        SSL_response=requests.head(url,timeout=10)
-    except requests.exceptions.RequestException:
-        has_valid_SSL=False
+        response = requests.get(url, verify=False, timeout=8, headers=headers)
+        end_time = time.perf_counter()
+        load_time = end_time - start_time
+        status_code = response.status_code
+        text = response.text
+        headers_dict = response.headers
+        redirect_chainlength = len(response.history)
+    except Exception:
+        return 500, "", 0.0, 0, False, False, False, False
 
-    has_strict_transport_security=False                   #HSTS
-    if "Strict-Transport-Security" in response.headers:
-        has_strict_transport_security=True
-    
-    has_content_security_policy=False                    #CSP
-    if "Content-Security-Policy" in response.headers:
-        has_content_security_policy=True
+    has_valid_SSL = True
+    try:
+        requests.head(url, timeout=5, headers=headers, verify=False)
+    except Exception:
+        has_valid_SSL = False
 
-    has_x_frame_options=False                            #X-Frame_Options
-    if "X-Frame-Options" in response.headers:
-        has_x_frame_options=True
+    has_strict_transport_security = "Strict-Transport-Security" in headers_dict
+    has_content_security_policy = "Content-Security-Policy" in headers_dict
+    has_x_frame_options = "X-Frame-Options" in headers_dict
 
-
-
-    return response.status_code, response.text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options
+    return status_code, text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
@@ -102,30 +98,49 @@ def parse_html(html_txt,base_url,key_word):
 
     
 
-    anchor_tags=soup.find_all("a")
-    internal_links=[]
-    external_links=[]
-    broken_links=[]
-    if len(anchor_tags)!=0:
+    anchor_tags = soup.find_all("a")
+    internal_links = []
+    external_links = []
+    links_to_test = []
+
+    if len(anchor_tags) != 0:
         for anchor_tag in anchor_tags:
-            href=anchor_tag.get("href")
+            href = anchor_tag.get("href")
             if href:
-                full_link=urljoin(base_url,href)
-                
-                if urlparse(base_url).netloc==urlparse(full_link).netloc:
+                full_link = urljoin(base_url, href)
+                if full_link.startswith(('mailto:', 'tel:', 'javascript:')):
+                    continue
+                if urlparse(base_url).netloc == urlparse(full_link).netloc:
                     internal_links.append(full_link)
+                    if len(internal_links) <= 15:
+                        links_to_test.append(full_link)
                 else:
                     external_links.append(full_link)
-                
-                if len(broken_links)<10:
-                    try:
-                        status_code=requests.head(full_link,timeout=2,verify=False).status_code
-                        if status_code>=400:
-                            broken_links.append(full_link)
-                    except:
-                        broken_links.append(full_link)
-            else:
-                continue
+                    if len(external_links) <= 5:
+                        links_to_test.append(full_link)
+
+    broken_links = []
+    if links_to_test:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        headers = {"User-Agent": "AthenuraSEOAuditor/1.0"}
+
+        def check_single_link(link):
+            try:
+                res = requests.head(link, timeout=1.5, verify=False, headers=headers)
+                if res.status_code >= 400:
+                    return link
+            except Exception:
+                return link
+            return None
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(check_single_link, l): l for l in links_to_test}
+            for future in as_completed(futures):
+                res_link = future.result()
+                if res_link:
+                    broken_links.append(res_link)
+                    if len(broken_links) >= 10:
+                        break
 
     canonical_tag_check=""
     canonical_tag = soup.find("link", rel="canonical")
@@ -240,10 +255,11 @@ def check_technical_files(base_url):
     
     has_robots=False
     has_sitemaps=False
+    headers = {"User-Agent": "AthenuraSEOAuditor/1.0"}
 
     try:
         robots_url=f"{base_url}/robots.txt"
-        response=requests.get(robots_url,timeout=5)
+        response=requests.get(robots_url,timeout=5,headers=headers)
         if response.status_code==200:
             has_robots=True
 
@@ -252,7 +268,7 @@ def check_technical_files(base_url):
 
     try:
         sitemaps_url=f"{base_url}/sitemap.xml"
-        response=requests.get(sitemaps_url,timeout=5)
+        response=requests.get(sitemaps_url,timeout=5,headers=headers)
 
         if response.status_code==200:
             has_sitemaps=True
@@ -268,8 +284,10 @@ def fetch_core_web_vitals(url):
     if api_key:
         api_url+=f"&key={api_key}"
 
+    headers = {"User-Agent": "AthenuraSEOAuditor/1.0"}
+
     try:
-        response = requests.get(api_url, timeout=30)
+        response = requests.get(api_url, timeout=30, headers=headers)
         data = response.json()
         
         # 1. Safely drill down to the "audits" folder. If anything is missing, return an empty dict {}

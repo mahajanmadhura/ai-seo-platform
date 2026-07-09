@@ -1,20 +1,38 @@
 from celery import shared_task
+from django.db.models import Q
+from django.conf import settings
 from .models import Audit,CrawledPage,SEOIssues
 from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis
 import traceback
 from django.utils import timezone
 
-@shared_task
-def run_seo_audit(audit_id):
+def _execute_seo_audit(audit_id):
     audit_website=Audit.objects.get(id=audit_id)
     audit_website.status="RUNNING"
     audit_website.save()
+    from process_status.services import update_process_status
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="RUNNING",
+        current_step="FETCHING_WEBSITE",
+        message="Fetching website content",
+        progress_percent=15
+    )
     print(f"We are going to audit the website with id {audit_id}")
 
     urls_to_visit=[audit_website.website.url]
     visited_urls=set()
 
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="RUNNING",
+        current_step="CHECKING_ROBOTS",
+        message="Checking robots.txt and sitemap files",
+        progress_percent=25
+    )
     robots,sitemap=check_technical_files(audit_website.website.url)
     audit_website.has_robots=robots
     audit_website.has_sitemap=sitemap
@@ -33,7 +51,14 @@ def run_seo_audit(audit_id):
             description="'sitemap.txt' couldnt be found"
         )
 
-
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="RUNNING",
+        current_step="CRAWLING_PAGES",
+        message="Crawling and analyzing site structure",
+        progress_percent=40
+    )
     while urls_to_visit and len(visited_urls)<=5:
         current_url=urls_to_visit.pop(0)
         if current_url in visited_urls:
@@ -44,6 +69,14 @@ def run_seo_audit(audit_id):
         
         try:
             status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options=fetch_url(current_url)
+            update_process_status(
+                process_type="audit",
+                object_id=audit_id,
+                status="RUNNING",
+                current_step="CHECKING_LINKS",
+                message=f"Analyzing links on page {len(visited_urls)}: {current_url}",
+                progress_percent=55
+            )
             result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
             performance_score = calculate_performance_score(load_time)
 
@@ -107,6 +140,14 @@ def run_seo_audit(audit_id):
 
                         )
 
+            update_process_status(
+                process_type="audit",
+                object_id=audit_id,
+                status="RUNNING",
+                current_step="PAGESPEED",
+                message=f"Requesting PageSpeed insights for page {len(visited_urls)}: {current_url}",
+                progress_percent=70
+            )
             core_web_vitals_analysis.delay(new_page.id)
 
             if result_of_parse["h1"]=="No h1 tags found":
@@ -278,12 +319,35 @@ def run_seo_audit(audit_id):
         
     
 
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="RUNNING",
+        current_step="SAVING_ISSUES",
+        message="Saving and compiling audit reports",
+        progress_percent=85
+    )
+
     if len(visited_urls)>0:
-        ai_response=generate_ai_recommendations(audit_website)
-        audit_website.ai_recommendation=ai_response
+        if getattr(settings, 'RUN_LEGACY_AUDIT_AI', False):
+            ai_response=generate_ai_recommendations(audit_website)
+            audit_website.ai_recommendation=ai_response
+        else:
+            audit_website.ai_recommendation="Structured insights can be generated using the AI Recommendations button on the report detail page."
         audit_website.completed_at = timezone.now()
         audit_website.total_pages = len(visited_urls)
-        audit_website.total_issues = SEOIssues.objects.filter(models.Q(audit=audit_website) | models.Q(url__audit=audit_website)).count()
+        audit_website.total_issues = SEOIssues.objects.filter(Q(audit=audit_website) | Q(url__audit=audit_website)).count()
+        
+        pages = CrawledPage.objects.filter(audit=audit_website)
+        if pages.exists():
+            valid_scores = [p.on_page_score for p in pages if p.on_page_score is not None]
+            if valid_scores:
+                audit_website.overall_Score = int(sum(valid_scores) / len(valid_scores))
+            else:
+                audit_website.overall_Score = 70
+        else:
+            audit_website.overall_Score = 0
+
         audit_website.status="DONE"
 
     else:
@@ -293,6 +357,39 @@ def run_seo_audit(audit_id):
     audit_website.save()
 
     return f"Audit Complete! Crawled through {len(visited_urls)} pages"
+
+
+@shared_task
+def run_seo_audit(audit_id):
+    try:
+        res = _execute_seo_audit(audit_id)
+        from process_status.services import update_process_status
+        update_process_status(
+            process_type="audit",
+            object_id=audit_id,
+            status="DONE",
+            current_step="DONE",
+            message="Done",
+            progress_percent=100
+        )
+        return res
+    except Exception as e:
+        try:
+            audit_website = Audit.objects.get(id=audit_id)
+            audit_website.status = "FAILED"
+            audit_website.save()
+            from process_status.services import update_process_status
+            update_process_status(
+                process_type="audit",
+                object_id=audit_id,
+                status="FAILED",
+                current_step="FAILED",
+                message=f"Audit failed: {str(e)}",
+                progress_percent=100
+            )
+        except:
+            pass
+        raise e
 
         
 @shared_task

@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'websites',
     'audits',
     'payments',
-
+    'audit_results',
+    'ai_recommendations',
+    'process_status',
 ]
 
 MIDDLEWARE = [
@@ -169,3 +171,5 @@ SIMPLE_JWT = {
 
 RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
+
+RUN_LEGACY_AUDIT_AI = False

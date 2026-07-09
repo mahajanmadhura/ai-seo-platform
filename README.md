@@ -91,7 +91,7 @@ Ensure your **Redis Server** is running locally (usually on `localhost:6379`), t
 .\venv\Scripts\activate
 
 # Start Celery
-celery -A config worker --loglevel=info --pool=solo
+celery -A config worker --loglevel=info --pool=eventlet --concurrency=10
 ```
 
 ---

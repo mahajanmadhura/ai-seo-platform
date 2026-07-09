@@ -163,7 +163,9 @@ class RefreshTokenView(APIView):
                         "id": user.id,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
-                        "email": user.email
+                        "email": user.email,
+                        "is_staff": user.is_staff,
+                        "is_superuser": user.is_superuser
                     }
                 }
             }, status=status.HTTP_200_OK)

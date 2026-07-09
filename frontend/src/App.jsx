@@ -2,20 +2,24 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
-import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
-import Landing from './pages/Landing';
+import { ProtectedRoute, PublicRoute, AdminProtectedRoute } from './components/ProtectedRoute';
+import Landing from './public/landing/Landing';
 import Navbar from './components/Navbar';
-import PublicFooter from './components/footer/PublicFooter';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import VerifyEmail from './pages/auth/VerifyEmail';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import ResetPassword from './pages/auth/ResetPassword';
-import Settings from './pages/dashboard/Settings';
-import Dashboard from './pages/dashboard/Dashboard';
-import WebsiteList from './pages/dashboard/WebsiteList';
-import AddWebsite from './pages/dashboard/AddWebsite';
-import WebsiteDetail from './pages/dashboard/WebsiteDetail';
+import PublicFooter from './components/PublicFooter';
+import Login from './public/auth/Login';
+import Register from './public/auth/Register';
+import VerifyEmail from './public/auth/VerifyEmail';
+import ForgotPassword from './public/auth/ForgotPassword';
+import ResetPassword from './public/auth/ResetPassword';
+import Settings from './client/settings/Settings';
+import Dashboard from './client/dashboard/Dashboard';
+import WebsiteList from './client/websites/WebsiteList';
+import AddWebsite from './client/websites/AddWebsite';
+import WebsiteDetail from './client/websites/WebsiteDetail';
+import AuditList from './client/audits/AuditList';
+import AuditDetail from './client/audits/AuditDetail';
+import Transactions from './client/billing/Transactions';
+import AdminDashboard from './admin/AdminDashboard';
 
 function App() {
   return (
@@ -60,6 +64,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/settings/transactions"
+              element={
+                <ProtectedRoute>
+                  <Transactions />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/profile" element={<Navigate to="/settings?tab=profile" replace />} />
             <Route path="/billing" element={<Navigate to="/settings?tab=billing" replace />} />
             <Route path="/credits" element={<Navigate to="/settings?tab=billing" replace />} />
@@ -71,6 +83,54 @@ function App() {
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/analytics"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit-logs"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/monitoring"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
               }
             />
             <Route
@@ -94,6 +154,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <WebsiteDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audits"
+              element={
+                <ProtectedRoute>
+                  <AuditList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audits/:id"
+              element={
+                <ProtectedRoute>
+                  <AuditDetail />
                 </ProtectedRoute>
               }
             />
