@@ -5,6 +5,10 @@ from .analysers import calculate_on_page_score,calculate_performance_score,gener
 import traceback
 from django.utils import timezone
 from django.db import models
+from concurrent.futures import ThreadPoolExecutor
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -35,259 +39,28 @@ def run_seo_audit(audit_id):
         )
 
 
-    while urls_to_visit and len(visited_urls)<=5:
-        current_url=urls_to_visit.pop(0)
-        if current_url in visited_urls:
-            continue
+    CONCURRENT_REQUESTS = 10  # matches your spec's crawler config
 
-        print(f"Crawling: {current_url}")
-        visited_urls.add(current_url)
-        
-        try:
-            status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options=fetch_url(current_url)
-            result_of_parse=parse_html(html_text,current_url,audit_website.key_word)
-            performance_score = calculate_performance_score(load_time)
+    while urls_to_visit and len(visited_urls) <= 500:  # matches max_pages from spec
+        batch = []
+        while urls_to_visit and len(batch) < CONCURRENT_REQUESTS:
+            url = urls_to_visit.pop(0)
+            if url not in visited_urls:
+                batch.append(url)
+                visited_urls.add(url)
 
-            
-            
-            score = calculate_on_page_score(
-                        result_of_parse["title"],
-                        result_of_parse["h1"],
-                        result_of_parse["h2"],  
-                        result_of_parse["h3"],  
-                        result_of_parse["img_without_alt_tags"], 
-                        result_of_parse["meta_description"],
-                        result_of_parse["canonical_tag_check"],
-                        result_of_parse["bold_count"],
-                        result_of_parse["url_structure_char_count"],
-                        current_url,
-                        result_of_parse["internal_links"],
-                        result_of_parse["keyword_in_title"],
-                        result_of_parse["keyword_in_h1"],
-                        result_of_parse["keyword_in_meta_description"],
-                        result_of_parse["keyword_density"],
-                        result_of_parse["keyword_in_h2_h3"],
-                    )
+        if not batch:
+            break
 
-            new_page = CrawledPage.objects.create(
-                            audit=audit_website,
-                            url=current_url,
-                            status_code=status_code,
-                            title=result_of_parse["title"],
-                            h1=result_of_parse["h1"],
-                            h2=result_of_parse["h2"],
-                            h3=result_of_parse["h3"],
-                            meta_description=result_of_parse["meta_description"],
-                            word_count=result_of_parse["word_count"],
-                            load_time=load_time,
-                            on_page_score=score,
-                            img_without_alt_tags=result_of_parse["img_without_alt_tags"],
-                            canonical_tag_check=result_of_parse["canonical_tag_check"],
-                            bold_count=result_of_parse["bold_count"],
-                            url_structure_char_count=result_of_parse["url_structure_char_count"],
-                            keyword_in_title=result_of_parse["keyword_in_title"],
-                            keyword_density=result_of_parse["keyword_density"],
-                            keyword_in_h1=result_of_parse["keyword_in_h1"],
-                            keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
-                            keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
-                            is_mobile_friendly=result_of_parse["is_mobile_friendly"],
-                            is_safe=result_of_parse["is_safe"],
-                            performance_score=performance_score,        
-                            redirect_chainlength=redirect_chainlength,
-                            is_crawlable=result_of_parse.get("is_crawlable",False),
-                            is_schema_json=result_of_parse.get("is_schema_json",False),
-                            is_hreflang=result_of_parse.get("is_hreflang",False),
-                            external_links_count=result_of_parse["external_links_count"],
-                            broken_links_count=result_of_parse["broken_links_count"],
-                            has_mobile_viewport_configuration=result_of_parse["has_mobile_viewport_configuration"],
-                            has_valid_SSL=has_valid_SSL,
-                            has_strict_transport_security=has_strict_transport_security,
-                            has_content_security_policy=has_content_security_policy,
-                            has_x_frame_options=has_x_frame_options,
-                            has_mixed_content=result_of_parse["has_mixed_content"],
+        with ThreadPoolExecutor(max_workers=CONCURRENT_REQUESTS) as executor:
+            results = executor.map(lambda u: process_page(u, audit_website), batch)
 
-                        )
-            for link_data in result_of_parse["all_links"]:
-                Link.objects.create(
-                    page=new_page,
-                    target_url=link_data["target_url"],
-                    anchor_text=link_data["anchor_text"],
-                    rel=link_data["rel"],
-                    is_internal=link_data["is_internal"],
-                    is_broken=link_data["is_broken"],
-                    status_code=link_data["status_code"],
-                    redirects=link_data["redirects"],
-                    redirect_target=link_data["redirect_target"],
-                )
+        for new_links in results:
+            for link in new_links:
+                if link not in urls_to_visit and link not in visited_urls:
+                    urls_to_visit.append(link)
 
-            core_web_vitals_analysis.delay(new_page.id)
-
-            if result_of_parse["h1"]=="No h1 tags found":
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing h1 tag on {current_url}",
-                )
-            
-            if result_of_parse["h2"]==0:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing h2 tag on {current_url}",
-                )
-            
-            if result_of_parse["h3"]==0:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing h3 tag on {current_url}",
-                )
-            
-            if result_of_parse["title"]=="No title found":
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing title tag on {current_url}",
-                )
-            
-            if result_of_parse["word_count"]==0:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"There are no words on the website: {current_url}",
-                )
-            
-            if result_of_parse["meta_description"]=="No meta description":
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing meta description tag on {current_url}",
-                )
-            
-            if result_of_parse["canonical_tag_check"]=="":
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing canonical tag on {current_url}",
-                )
-
-            if result_of_parse["bold_count"]==0:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"No bold tags found on {current_url}",
-                )
-            
-            if result_of_parse["url_structure_char_count"]>100:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"url is longer than 100 characters on the {current_url}",
-                )
-            
-            if not result_of_parse["is_mobile_friendly"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website isnt mobile responsive as viewport is absent on {current_url}"
-                )
-
-            if not result_of_parse["is_safe"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Missing SSL certificate: Website isnt secure as it doesnt have https on {current_url}"
-                )
-            
-            if load_time > 2.5:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"Slow page load time ({load_time}s) on {current_url}. Target is < 2.5s."
-                )
-
-            if status_code==404:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"Status code 404 on {current_url}",
-                )
-
-            if redirect_chainlength>2:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The page redirected {redirect_chainlength} number of times on {current_url}",
-                )
-
-            if not result_of_parse["is_crawlable"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website isnt crawlable at as it is missing robots {current_url}",
-                )
-            
-            if not result_of_parse["is_schema_json"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"There are no Schema Json tags on the website at {current_url}",
-                )
-            if not result_of_parse["is_hreflang"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website doesnt have hreflang tags at {current_url}",
-                )
-            
-            if not result_of_parse["has_mobile_viewport_configuration"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"The website doesnt have proper mobile viewport configuration at {current_url}",
-                )
-            
-            if not has_valid_SSL:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website doesnt have a valid SSL certificate at {current_url}",
-                )
-
-            if not has_strict_transport_security:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website doesnt have strict transport security at {current_url}",
-                )
-
-            if not has_content_security_policy:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website doesnt have a content security policy at {current_url}",
-                )
-
-            if not has_x_frame_options:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="ERROR",
-                    description=f"The website doesnt have a X frame options at {current_url}",
-                )
-
-            if result_of_parse["has_mixed_content"]:
-                SEOIssues.objects.create(
-                    url=new_page,
-                    issue_type="WARNING",
-                    description=f"The website has mixed content (HTTPS pages loading HTTP resources) at {current_url}",
-                )
-
-            for new_link in result_of_parse["internal_links"]:
-                if new_link not in urls_to_visit:
-                    urls_to_visit.append(new_link)
-        except Exception as e:
-            print(f"Audit failed, Error: {e}")
-            traceback.print_exc()
+        send_progress(audit_id, {"pages_crawled": len(visited_urls)})  # from step 2 below
         
     
 
@@ -376,3 +149,142 @@ def core_web_vitals_analysis(page_id):
             issue_type="WARNING",
             description=f"Buttons/Links are too close together for mobile tapping on {current_url}"
         )
+
+
+def process_page(current_url, audit_website):
+    """Does everything your while-loop body used to do for one URL."""
+    status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options = fetch_url(current_url)
+    result_of_parse = parse_html(html_text, current_url, audit_website.key_word)
+    performance_score = calculate_performance_score(load_time)
+
+    score = calculate_on_page_score(
+        result_of_parse["title"], result_of_parse["h1"], result_of_parse["h2"],
+        result_of_parse["h3"], result_of_parse["img_without_alt_tags"],
+        result_of_parse["meta_description"], result_of_parse["canonical_tag_check"],
+        result_of_parse["bold_count"], result_of_parse["url_structure_char_count"],
+        current_url, result_of_parse["internal_links"], result_of_parse["keyword_in_title"],
+        result_of_parse["keyword_in_h1"], result_of_parse["keyword_in_meta_description"],
+        result_of_parse["keyword_density"], result_of_parse["keyword_in_h2_h3"],
+    )
+
+    new_page = CrawledPage.objects.create(
+        audit=audit_website, url=current_url, status_code=status_code,
+        title=result_of_parse["title"], h1=result_of_parse["h1"], h2=result_of_parse["h2"],
+        h3=result_of_parse["h3"], meta_description=result_of_parse["meta_description"],
+        word_count=result_of_parse["word_count"], load_time=load_time, on_page_score=score,
+        img_without_alt_tags=result_of_parse["img_without_alt_tags"],
+        canonical_tag_check=result_of_parse["canonical_tag_check"],
+        bold_count=result_of_parse["bold_count"],
+        url_structure_char_count=result_of_parse["url_structure_char_count"],
+        keyword_in_title=result_of_parse["keyword_in_title"],
+        keyword_density=result_of_parse["keyword_density"],
+        keyword_in_h1=result_of_parse["keyword_in_h1"],
+        keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
+        keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
+        is_mobile_friendly=result_of_parse["is_mobile_friendly"],
+        is_safe=result_of_parse["is_safe"], performance_score=performance_score,
+        redirect_chainlength=redirect_chainlength,
+        is_crawlable=result_of_parse.get("is_crawlable", False),
+        is_schema_json=result_of_parse.get("is_schema_json", False),
+        is_hreflang=result_of_parse.get("is_hreflang", False),
+        external_links_count=result_of_parse["external_links_count"],
+        broken_links_count=result_of_parse["broken_links_count"],
+        has_mobile_viewport_configuration=result_of_parse["has_mobile_viewport_configuration"],
+        has_valid_SSL=has_valid_SSL, has_strict_transport_security=has_strict_transport_security,
+        has_content_security_policy=has_content_security_policy, has_x_frame_options=has_x_frame_options,
+        has_mixed_content=result_of_parse["has_mixed_content"],
+    )
+
+    for link_data in result_of_parse["all_links"]:
+        Link.objects.create(page=new_page, **link_data)
+
+    core_web_vitals_analysis.delay(new_page.id)
+    create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
+                       has_valid_SSL, has_strict_transport_security,
+                       has_content_security_policy, has_x_frame_options, load_time)
+
+    return result_of_parse["internal_links"]
+
+def send_progress(audit_id, data):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'audit_{audit_id}', {"type": "audit_progress", "data": data}
+    )
+
+
+def create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
+                       has_valid_SSL, has_strict_transport_security,
+                       has_content_security_policy, has_x_frame_options, load_time):
+    try:
+        if result_of_parse["h1"]=="No h1 tags found":
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing h1 tag on {new_page.url}")
+
+        if result_of_parse["h2"]==0:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing h2 tag on {new_page.url}")
+
+        if result_of_parse["h3"]==0:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing h3 tag on {new_page.url}")
+
+        if result_of_parse["title"]=="No title found":
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing title tag on {new_page.url}")
+
+        if result_of_parse["word_count"]==0:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"There are no words on the website: {new_page.url}")
+
+        if result_of_parse["meta_description"]=="No meta description":
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing meta description tag on {new_page.url}")
+
+        if result_of_parse["canonical_tag_check"]=="":
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing canonical tag on {new_page.url}")
+
+        if result_of_parse["bold_count"]==0:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"No bold tags found on {new_page.url}")
+
+        if result_of_parse["url_structure_char_count"]>100:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"url is longer than 100 characters on the {new_page.url}")
+
+        if not result_of_parse["is_mobile_friendly"]:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website isnt mobile responsive as viewport is absent on {new_page.url}")
+
+        if not result_of_parse["is_safe"]:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing SSL certificate: Website isnt secure as it doesnt have https on {new_page.url}")
+
+        if load_time > 2.5:
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"Slow page load time ({load_time}s) on {new_page.url}. Target is < 2.5s.")
+
+        if status_code==404:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Status code 404 on {new_page.url}")
+
+        if redirect_chainlength>2:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The page redirected {redirect_chainlength} number of times on {new_page.url}")
+
+        if not result_of_parse["is_crawlable"]:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website isnt crawlable at as it is missing robots {new_page.url}")
+
+        if not result_of_parse["is_schema_json"]:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"There are no Schema Json tags on the website at {new_page.url}")
+
+        if not result_of_parse["is_hreflang"]:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have hreflang tags at {new_page.url}")
+
+        if not result_of_parse["has_mobile_viewport_configuration"]:
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"The website doesnt have proper mobile viewport configuration at {new_page.url}")
+
+        if not has_valid_SSL:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have a valid SSL certificate at {new_page.url}")
+
+        if not has_strict_transport_security:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have strict transport security at {new_page.url}")
+
+        if not has_content_security_policy:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have a content security policy at {new_page.url}")
+
+        if not has_x_frame_options:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have a X frame options at {new_page.url}")
+
+        if result_of_parse["has_mixed_content"]:
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"The website has mixed content (HTTPS pages loading HTTP resources) at {new_page.url}")
+
+    except Exception as e:
+        print(f"Issue creation failed for {new_page.url}, Error: {e}")
+        traceback.print_exc()

@@ -40,7 +40,7 @@ class CrawledPage(models.Model):
     keyword_in_title=models.BooleanField(default=False)
     keyword_in_h1=models.BooleanField(default=False)
     keyword_in_meta_description=models.BooleanField(default=False)
-    keyword_density=models.IntegerField(default=0)
+    keyword_density=models.FloatField(default=0.0)
     keyword_in_h2_h3=models.BooleanField(default=False)
     is_mobile_friendly=models.BooleanField(default=False)
     is_safe=models.BooleanField(default=False)

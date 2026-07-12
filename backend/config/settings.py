@@ -56,6 +56,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+ASGI_APPLICATION = 'config.asgi.application'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -118,7 +120,6 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")  # Your Brevo login email
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")  # SMTP key, not API key
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")  # Must be verified in Brevo
 
-# Channels Configuration
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -127,3 +128,5 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+

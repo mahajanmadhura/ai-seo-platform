@@ -313,7 +313,7 @@ def fetch_core_web_vitals(url):
         #Mobile SEO analysis
         font_score = audits.get("font-size",{}).get("numericValue",0)
         tap_score = audits.get("tap-targets",{}).get("numericValue",0)
-        mobile_viewport_configuration=audits.get("",{})
+        viewport_audit = audits.get("viewport", {})
 
         return {
             "lcp": round(lcp_raw / 1000, 2), # Convert ms to s, and round to 2 decimals
@@ -337,4 +337,5 @@ def fetch_core_web_vitals(url):
             "fid":0.00,
             "mobile_font_readability":False,
             "mobile_tap_targets":False,
+            
         }
