@@ -1,13 +1,14 @@
 from celery import shared_task
 from .models import Audit,CrawledPage,SEOIssues, Link
-from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals
-from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis
+from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension
+from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile
 import traceback
 from django.utils import timezone
 from django.db import models
 from concurrent.futures import ThreadPoolExecutor
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+
 
 
 @shared_task
@@ -17,13 +18,15 @@ def run_seo_audit(audit_id):
     audit_website.save()
     print(f"We are going to audit the website with id {audit_id}")
 
-    urls_to_visit=[audit_website.website.url]
+    urls_to_visit=[(audit_website.website.url, 0)]  # (url, depth) — homepage is depth 0
     visited_urls=set()
+    queued_urls = {audit_website.website.url}
 
     robots,sitemap=check_technical_files(audit_website.website.url)
     audit_website.has_robots=robots
     audit_website.has_sitemap=sitemap
     audit_website.save()
+    robots_parser = get_robots_parser(audit_website.website.url)
 
     if not robots:
         SEOIssues.objects.create(
@@ -37,34 +40,52 @@ def run_seo_audit(audit_id):
             issue_type="WARNING",
             description="'sitemap.txt' couldnt be found"
         )
+    
+    if sitemap:
+        sitemap_urls = parse_sitemap(audit_website.website.url)
+        for sitemap_url in sitemap_urls:
+            if (sitemap_url not in queued_urls
+                and not is_disallowed(sitemap_url)
+                and is_allowed_extension(sitemap_url)
+                and robots_parser.can_fetch(HEADERS["User-Agent"], sitemap_url)):
+                urls_to_visit.append((sitemap_url, 0))
+                queued_urls.add(sitemap_url)
 
 
     CONCURRENT_REQUESTS = 10  # matches your spec's crawler config
 
-    while urls_to_visit and len(visited_urls) <= 500:  # matches max_pages from spec
+    MAX_DEPTH = 5  # matches your spec
+
+    while urls_to_visit and len(visited_urls) <= 500:
         batch = []
         while urls_to_visit and len(batch) < CONCURRENT_REQUESTS:
-            url = urls_to_visit.pop(0)
+            url, depth = urls_to_visit.pop(0)
             if url not in visited_urls:
-                batch.append(url)
+                batch.append((url, depth))
                 visited_urls.add(url)
 
         if not batch:
             break
 
         with ThreadPoolExecutor(max_workers=CONCURRENT_REQUESTS) as executor:
-            results = executor.map(lambda u: process_page(u, audit_website), batch)
+            results = executor.map(lambda item: process_page(item[0], audit_website), batch)
 
-        for new_links in results:
-            for link in new_links:
-                if link not in urls_to_visit and link not in visited_urls:
-                    urls_to_visit.append(link)
+        for (url, depth), new_links in zip(batch, results):
+            if depth < MAX_DEPTH:
+                for link in new_links:
+                    if (link not in queued_urls
+                        and not is_disallowed(link)
+                        and is_allowed_extension(link)
+                        and robots_parser.can_fetch(HEADERS["User-Agent"], link)):
+                        urls_to_visit.append((link, depth + 1))
+                        queued_urls.add(link)
 
         send_progress(audit_id, {"pages_crawled": len(visited_urls)})  # from step 2 below
         
     
 
     if len(visited_urls)>0:
+        analyze_link_profile(audit_website)
         ai_response=generate_ai_recommendations(audit_website)
         audit_website.ai_recommendation=ai_response
         audit_website.completed_at = timezone.now()
@@ -152,7 +173,7 @@ def core_web_vitals_analysis(page_id):
 
 
 def process_page(current_url, audit_website):
-    """Does everything your while-loop body used to do for one URL."""
+    print(f"Crawling: {current_url}")
     status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options = fetch_url(current_url)
     result_of_parse = parse_html(html_text, current_url, audit_website.key_word)
     performance_score = calculate_performance_score(load_time)

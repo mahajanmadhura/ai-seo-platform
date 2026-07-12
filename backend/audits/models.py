@@ -89,4 +89,4 @@ class Link(models.Model):
     is_broken = models.BooleanField(default=False)
     status_code = models.IntegerField(null=True, blank=True)
     redirects = models.BooleanField(default=False)
-    redirect_target = models.URLField(null=True, blank=True)
+    redirect_target = models.URLField(null=True, blank=True,max_length=2048)

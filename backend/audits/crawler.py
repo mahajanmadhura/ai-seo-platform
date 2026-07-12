@@ -5,36 +5,100 @@ import traceback
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import re
+from urllib.robotparser import RobotFileParser
+import xml.etree.ElementTree as ET
+
+DISALLOWED_PATHS = ['/admin', '/login', '/cart', '/checkout']
+HEADERS = {"User-Agent": "AI-SEO-Audit-Bot/1.0"}
+ALLOWED_EXTENSIONS = ['.html', '.php', '.asp', '/']
+MAX_REDIRECTS = 5
+REQUEST_TIMEOUT = 30
+
+def parse_sitemap(base_url):
+    parsed = urlparse(base_url)
+    root_url = f"{parsed.scheme}://{parsed.netloc}"
+    sitemap_url = f"{root_url}/sitemap.xml"
+    urls = []
+    namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+
+    try:
+        response = requests.get(sitemap_url, timeout=10, headers=HEADERS, verify=False)
+        if response.status_code != 200:
+            return urls
+
+        root = ET.fromstring(response.content)
+
+        # Handle sitemap index files (a sitemap that just lists other sitemaps)
+        sitemap_entries = root.findall('.//ns:sitemap/ns:loc', namespace)
+        if sitemap_entries:
+            for entry in sitemap_entries[:10]:  # cap to avoid pulling in hundreds of sub-sitemaps
+                try:
+                    sub_response = requests.get(entry.text, timeout=10, headers=HEADERS, verify=False)
+                    if sub_response.status_code == 200:
+                        sub_root = ET.fromstring(sub_response.content)
+                        for loc in sub_root.findall('.//ns:url/ns:loc', namespace):
+                            urls.append(loc.text.strip())
+                except Exception:
+                    continue
+        else:
+            for loc in root.findall('.//ns:url/ns:loc', namespace):
+                urls.append(loc.text.strip())
+
+    except Exception as e:
+        print(f"Couldn't parse sitemap: {e}")
+        traceback.print_exc()
+
+    return urls
+
+
+
+def is_disallowed(url):
+    path = urlparse(url).path.lower()
+    return any(path.startswith(blocked) for blocked in DISALLOWED_PATHS)
+
+def is_allowed_extension(url):
+    path = urlparse(url).path.lower()
+    if path == "" or path.endswith("/"):
+        return True
+    ext = os.path.splitext(path)[1]
+    if ext == "":
+        return True  # extensionless routes like /about are fine
+    return ext in ALLOWED_EXTENSIONS
+
 
 def fetch_url(url):
-    start_time=time.perf_counter()
-    response=requests.get(url,verify=False)
-    end_time=time.perf_counter()
+    time.sleep(0.5)
+    start_time = time.perf_counter()
 
-    load_time=end_time-start_time
-    redirect_chainlength=len(response.history)
-
-    has_valid_SSL=True
     try:
-        SSL_response=requests.head(url,timeout=10)
+        session = requests.Session()
+        session.max_redirects = MAX_REDIRECTS
+        response = session.get(url, verify=False, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+    except requests.exceptions.TooManyRedirects:
+        end_time = time.perf_counter()
+        print(f"Redirect loop detected on {url}")
+        return 0, "", end_time - start_time, MAX_REDIRECTS + 1, False, False, False, False
+    except requests.exceptions.RequestException as e:
+        end_time = time.perf_counter()
+        print(f"Failed to fetch {url}: {e}")
+        return 0, "", end_time - start_time, 0, False, False, False, False
+
+    end_time = time.perf_counter()
+    load_time = end_time - start_time
+    redirect_chainlength = len(response.history)
+
+    has_valid_SSL = True
+    try:
+        SSL_response = requests.head(url, timeout=10, headers=HEADERS)
     except requests.exceptions.RequestException:
-        has_valid_SSL=False
+        has_valid_SSL = False
 
-    has_strict_transport_security=False                   #HSTS
-    if "Strict-Transport-Security" in response.headers:
-        has_strict_transport_security=True
-    
-    has_content_security_policy=False                    #CSP
-    if "Content-Security-Policy" in response.headers:
-        has_content_security_policy=True
-
-    has_x_frame_options=False                            #X-Frame_Options
-    if "X-Frame-Options" in response.headers:
-        has_x_frame_options=True
-
-
+    has_strict_transport_security = "Strict-Transport-Security" in response.headers
+    has_content_security_policy = "Content-Security-Policy" in response.headers
+    has_x_frame_options = "X-Frame-Options" in response.headers
 
     return response.status_code, response.text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options
+
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
@@ -131,7 +195,7 @@ def parse_html(html_txt,base_url,key_word):
 
             if len(broken_links)<10:
                 try:
-                    resp = requests.head(full_link, timeout=2, verify=False, allow_redirects=False)
+                    resp = requests.head(full_link, timeout=2, verify=False, allow_redirects=False, headers=HEADERS)
                     status_code = resp.status_code
                     if status_code>=400:
                         is_broken = True
@@ -271,7 +335,7 @@ def check_technical_files(base_url):
 
     try:
         robots_url=f"{base_url}/robots.txt"
-        response=requests.get(robots_url,timeout=5)
+        response=requests.get(robots_url,timeout=5, headers=HEADERS)
         if response.status_code==200:
             has_robots=True
 
@@ -280,7 +344,7 @@ def check_technical_files(base_url):
 
     try:
         sitemaps_url=f"{base_url}/sitemap.xml"
-        response=requests.get(sitemaps_url,timeout=5)
+        response=requests.get(sitemaps_url,timeout=5, headers=HEADERS)
 
         if response.status_code==200:
             has_sitemaps=True
@@ -339,3 +403,17 @@ def fetch_core_web_vitals(url):
             "mobile_tap_targets":False,
             
         }
+    
+
+def get_robots_parser(base_url):
+    parsed = urlparse(base_url)
+    root_url = f"{parsed.scheme}://{parsed.netloc}"
+    robots_url = f"{root_url}/robots.txt"
+
+    rp = RobotFileParser()
+    rp.set_url(robots_url)
+    try:
+        rp.read()
+    except Exception:
+        pass  # if robots.txt can't be read, rp.can_fetch will just allow everything by default
+    return rp

@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from .models import Audit,CrawledPage,SEOIssues
 from django.db.models import Q
+
 load_dotenv()
 
 
@@ -148,3 +149,86 @@ def performance_analysis(lcp,fid,cls,ttfb,fcp):
 
     return score
 
+def classify_anchor_text(anchor_text, keyword):
+    text = anchor_text.strip().lower() if anchor_text else ""
+
+    if text == "":
+        return "empty"
+
+    generic_phrases = ["click here", "read more", "learn more", "here", "this link", "more info", "website", "link", "see more"]
+    if text in generic_phrases:
+        return "generic"
+
+    if text.startswith("http") or text.startswith("www."):
+        return "naked_url"
+
+    if keyword:
+        keyword_lower = keyword.lower()
+        if text == keyword_lower:
+            return "exact_match"
+        elif keyword_lower in text:
+            return "partial_match"
+
+    return "branded_or_other"
+
+
+def analyze_link_profile(audit):
+    from .models import Link, SEOIssues
+
+    links = Link.objects.filter(page__audit=audit)
+    total = links.count()
+    if total == 0:
+        return
+
+    internal_links = links.filter(is_internal=True)
+    external_links = links.filter(is_internal=False)
+
+    # Check 1: internal links wrongly marked nofollow
+    internal_nofollow_count = internal_links.filter(rel__icontains="nofollow").count()
+    if internal_nofollow_count > 0:
+        SEOIssues.objects.create(
+            audit=audit,
+            issue_type="WARNING",
+            description=f"{internal_nofollow_count} internal link(s) incorrectly use rel='nofollow', wasting internal link equity"
+        )
+
+    # Check 2: generic / empty anchor text
+    generic_count = 0
+    empty_count = 0
+    for link in links:
+        category = classify_anchor_text(link.anchor_text, audit.key_word)
+        if category == "generic":
+            generic_count += 1
+        elif category == "empty":
+            empty_count += 1
+
+    if empty_count > 0:
+        SEOIssues.objects.create(
+            audit=audit,
+            issue_type="WARNING",
+            description=f"{empty_count} link(s) found with no anchor text, hurting accessibility and SEO context"
+        )
+
+    if generic_count > 0:
+        pct = round((generic_count / total) * 100, 1)
+        if pct > 20:
+            SEOIssues.objects.create(
+                audit=audit,
+                issue_type="WARNING",
+                description=f"{generic_count} link(s) ({pct}%) use generic anchor text like 'click here' instead of descriptive text"
+            )
+
+    # Check 3: exact-match keyword anchor over-concentration on external links
+    if audit.key_word and external_links.count() > 0:
+        ext_total = external_links.count()
+        exact_match_external_count = sum(
+            1 for link in external_links
+            if classify_anchor_text(link.anchor_text, audit.key_word) == "exact_match"
+        )
+        exact_pct = round((exact_match_external_count / ext_total) * 100, 1)
+        if exact_pct > 30:
+            SEOIssues.objects.create(
+                audit=audit,
+                issue_type="WARNING",
+                description=f"{exact_pct}% of external links use exact keyword-match anchor text ('{audit.key_word}'), which can look like an unnatural link pattern"
+            )
