@@ -1,9 +1,10 @@
 from celery import shared_task
-from .models import Audit,CrawledPage,SEOIssues
+from .models import Audit,CrawledPage,SEOIssues, Link
 from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis
 import traceback
 from django.utils import timezone
+from django.db import models
 
 @shared_task
 def run_seo_audit(audit_id):
@@ -106,6 +107,18 @@ def run_seo_audit(audit_id):
                             has_mixed_content=result_of_parse["has_mixed_content"],
 
                         )
+            for link_data in result_of_parse["all_links"]:
+                Link.objects.create(
+                    page=new_page,
+                    target_url=link_data["target_url"],
+                    anchor_text=link_data["anchor_text"],
+                    rel=link_data["rel"],
+                    is_internal=link_data["is_internal"],
+                    is_broken=link_data["is_broken"],
+                    status_code=link_data["status_code"],
+                    redirects=link_data["redirects"],
+                    redirect_target=link_data["redirect_target"],
+                )
 
             core_web_vitals_analysis.delay(new_page.id)
 

@@ -106,26 +106,53 @@ def parse_html(html_txt,base_url,key_word):
     internal_links=[]
     external_links=[]
     broken_links=[]
+    all_links=[]
+
     if len(anchor_tags)!=0:
         for anchor_tag in anchor_tags:
             href=anchor_tag.get("href")
-            if href:
-                full_link=urljoin(base_url,href)
-                
-                if urlparse(base_url).netloc==urlparse(full_link).netloc:
-                    internal_links.append(full_link)
-                else:
-                    external_links.append(full_link)
-                
-                if len(broken_links)<10:
-                    try:
-                        status_code=requests.head(full_link,timeout=2,verify=False).status_code
-                        if status_code>=400:
-                            broken_links.append(full_link)
-                    except:
-                        broken_links.append(full_link)
-            else:
+            if not href:
                 continue
+
+            full_link=urljoin(base_url,href)
+            is_internal = urlparse(base_url).netloc==urlparse(full_link).netloc
+            anchor_text = anchor_tag.text.strip() if anchor_tag.text else ""
+            rel = " ".join(anchor_tag.get("rel", [])) if anchor_tag.get("rel") else ""
+
+            if is_internal:
+                internal_links.append(full_link)
+            else:
+                external_links.append(full_link)
+
+            status_code = None
+            is_broken = False
+            redirects = False
+            redirect_target = None
+
+            if len(broken_links)<10:
+                try:
+                    resp = requests.head(full_link, timeout=2, verify=False, allow_redirects=False)
+                    status_code = resp.status_code
+                    if status_code>=400:
+                        is_broken = True
+                        broken_links.append(full_link)
+                    if 300<=status_code<400:
+                        redirects = True
+                        redirect_target = resp.headers.get("Location")
+                except:
+                    is_broken = True
+                    broken_links.append(full_link)
+
+            all_links.append({
+                "target_url": full_link,
+                "anchor_text": anchor_text,
+                "rel": rel,
+                "is_internal": is_internal,
+                "status_code": status_code,
+                "is_broken": is_broken,
+                "redirects": redirects,
+                "redirect_target": redirect_target,
+            })
 
     canonical_tag_check=""
     canonical_tag = soup.find("link", rel="canonical")
@@ -226,7 +253,8 @@ def parse_html(html_txt,base_url,key_word):
             "is_schema_json":is_schema_json,
             "is_hreflang":is_hreflang,
             "has_mobile_viewport_configuration":has_mobile_viewport_configuration,
-            "has_mixed_content":has_mixed_content
+            "has_mixed_content":has_mixed_content,
+            "all_links": all_links,
 
             }
 

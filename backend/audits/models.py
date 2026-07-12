@@ -78,3 +78,15 @@ class SEOIssues(models.Model):
     issue_type=models.CharField(max_length=20,choices=issue_choices)
     description=models.TextField()
     is_fixed=models.BooleanField(default=False)
+
+
+class Link(models.Model):
+    page = models.ForeignKey(CrawledPage, on_delete=models.CASCADE, related_name='links')
+    target_url = models.URLField(blank=True, null=True)
+    anchor_text = models.CharField(max_length=255, null=True, blank=True)
+    rel = models.CharField(max_length=255, null=True, blank=True)
+    is_internal = models.BooleanField(default=False)
+    is_broken = models.BooleanField(default=False)
+    status_code = models.IntegerField(null=True, blank=True)
+    redirects = models.BooleanField(default=False)
+    redirect_target = models.URLField(null=True, blank=True)
