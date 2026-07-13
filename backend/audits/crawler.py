@@ -1,4 +1,4 @@
-import requests, time, os
+import requests, time, os, json
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin,urlparse
 import traceback
@@ -13,6 +13,74 @@ HEADERS = {"User-Agent": "AI-SEO-Audit-Bot/1.0"}
 ALLOWED_EXTENSIONS = ['.html', '.php', '.asp', '/']
 MAX_REDIRECTS = 5
 REQUEST_TIMEOUT = 30
+CTA_PHRASES = ["learn more", "shop now", "get started", "buy now", "sign up", "read more",
+               "discover", "explore", "contact us", "try", "download", "subscribe",
+               "book now", "order now", "join", "call now"]
+MAX_BROKEN_LINK_CHECKS_PER_PAGE = 30  # was 10 — synchronous HEAD requests per page, keep bounded
+HREFLANG_PATTERN = re.compile(r'^[a-z]{2}(-[A-Z]{2})?$|^x-default$')
+
+def validate_hreflang(soup, base_url):
+    hreflang_tags = soup.find_all("link", attrs={"rel": "alternate", "hreflang": True})
+    if not hreflang_tags:
+        return {"is_hreflang": False, "invalid_hreflang_codes": [], "hreflang_entries": []}
+
+    invalid_codes = []
+    entries = []
+    for tag in hreflang_tags:
+        code = tag.get("hreflang", "")
+        href = tag.get("href")
+        if not HREFLANG_PATTERN.match(code):
+            invalid_codes.append(code)
+        if href:
+            entries.append({"lang": code, "href": urljoin(base_url, href)})
+
+    return {"is_hreflang": True, "invalid_hreflang_codes": invalid_codes, "hreflang_entries": entries}
+
+def validate_structured_data(soup):
+    schema_scripts = soup.find_all("script", type="application/ld+json")
+    if not schema_scripts:
+        return {"is_schema_json": False, "is_schema_valid": False, "schema_errors": []}
+
+    valid_count = 0
+    errors = []
+    for script in schema_scripts:
+        try:
+            data = json.loads(script.string or "")
+            entries = data if isinstance(data, list) else [data]
+            for entry in entries:
+                if "@context" not in entry:
+                    errors.append("Missing @context field")
+                elif "schema.org" not in str(entry.get("@context", "")):
+                    errors.append("@context doesn't reference schema.org")
+                if "@type" not in entry:
+                    errors.append("Missing @type field")
+                else:
+                    valid_count += 1
+        except (json.JSONDecodeError, TypeError, AttributeError) as e:
+            errors.append(f"Invalid JSON syntax: {str(e)}")
+
+    return {
+        "is_schema_json": True,
+        "is_schema_valid": valid_count > 0 and len(errors) == 0,
+        "schema_errors": errors,
+    }
+
+    
+def check_url_structure(url):
+    parsed = urlparse(url)
+    path = parsed.path
+    issues = []
+    if path != path.lower():
+        issues.append("uppercase characters")
+    if "_" in path:
+        issues.append("underscores instead of hyphens")
+    if " " in url or "%20" in url:
+        issues.append("spaces")
+    return issues
+
+def has_call_to_action(text):
+    text_lower = text.lower()
+    return any(phrase in text_lower for phrase in CTA_PHRASES)
 
 def parse_sitemap(base_url):
     parsed = urlparse(base_url)
@@ -65,6 +133,15 @@ def is_allowed_extension(url):
         return True  # extensionless routes like /about are fine
     return ext in ALLOWED_EXTENSIONS
 
+def detect_redirect_loop(response):
+    seen = set()
+    chain = [r.url for r in response.history] + [response.url]
+    for url in chain:
+        if url in seen:
+            return True
+        seen.add(url)
+    return False
+
 
 def fetch_url(url):
     time.sleep(0.5)
@@ -77,28 +154,34 @@ def fetch_url(url):
     except requests.exceptions.TooManyRedirects:
         end_time = time.perf_counter()
         print(f"Redirect loop detected on {url}")
-        return 0, "", end_time - start_time, MAX_REDIRECTS + 1, False, False, False, False
+        return 0, "", end_time - start_time, MAX_REDIRECTS + 1, False, False, False, False, True, False
     except requests.exceptions.RequestException as e:
         end_time = time.perf_counter()
         print(f"Failed to fetch {url}: {e}")
-        return 0, "", end_time - start_time, 0, False, False, False, False
+        return 0, "", end_time - start_time, 0, False, False, False, False, False, False
 
     end_time = time.perf_counter()
     load_time = end_time - start_time
     redirect_chainlength = len(response.history)
+    is_redirect_loop = detect_redirect_loop(response)
 
-    has_valid_SSL = True
-    try:
-        SSL_response = requests.head(url, timeout=10, headers=HEADERS)
-    except requests.exceptions.RequestException:
-        has_valid_SSL = False
+    has_valid_SSL = False
+    if urlparse(url).scheme == "https":
+        try:
+            requests.head(url, timeout=10, headers=HEADERS)  # verify=True by default — raises on bad cert
+            has_valid_SSL = True
+        except requests.exceptions.SSLError:
+            has_valid_SSL = False
+        except requests.exceptions.RequestException:
+            # Non-SSL failure (timeout, connection refused, etc.) — not a cert problem, but not confirmed valid either
+            has_valid_SSL = False
 
     has_strict_transport_security = "Strict-Transport-Security" in response.headers
     has_content_security_policy = "Content-Security-Policy" in response.headers
     has_x_frame_options = "X-Frame-Options" in response.headers
+    x_robots_noindex = "noindex" in response.headers.get("X-Robots-Tag", "").lower()
 
-    return response.status_code, response.text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options
-
+    return response.status_code, response.text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options, is_redirect_loop, x_robots_noindex
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
@@ -113,20 +196,26 @@ def parse_html(html_txt,base_url,key_word):
     h3=len(soup.find_all("h3")) if soup.find("h3") else 0
  
     word_count=len(soup.get_text().split(" ")) if soup.get_text() else 0
-
+    
     meta_tag=soup.find("meta",attrs={"name":"description"})
     if meta_tag and meta_tag.get("content"):
         meta_content=meta_tag.get("content") 
     else:
         meta_content="No meta description"
 
+    meta_description_has_cta = has_call_to_action(meta_content) if meta_content != "No meta description" else False
+
 
     image_tags=soup.find_all("img")
 
 
     img_without_alt_tags=[]
+    poor_quality_alt_tags=[]
 
     has_mixed_content=False
+
+    GENERIC_ALT_TEXTS = {"image", "photo", "picture", "img", "graphic", "icon", "logo"}
+    FILENAME_ALT_PATTERN = re.compile(r'^(img|image|photo|dsc|pic)[\-_]?\d*$', re.IGNORECASE)
 
     if len(image_tags)!=0:
         for image_tag in image_tags:
@@ -140,11 +229,17 @@ def parse_html(html_txt,base_url,key_word):
                     has_mixed_content=True
             
             if image_tag.get("alt"):
+                alt_text = image_tag.get("alt").strip()
+                is_poor = (
+                    len(alt_text) < 5
+                    or alt_text.lower() in GENERIC_ALT_TEXTS
+                    or bool(FILENAME_ALT_PATTERN.match(alt_text))
+                )
+                if is_poor:
+                    poor_quality_alt_tags.append({"src": full_src, "alt": alt_text})
                 continue
             else:
-                
-                img_without_alt_tags.append({"src":full_src,
-                                             "alt":image_tag.get("alt")})
+                img_without_alt_tags.append({"src": full_src, "alt": image_tag.get("alt")})
                 
     if not has_mixed_content:
         all_scripts = soup.find_all("script")
@@ -193,7 +288,7 @@ def parse_html(html_txt,base_url,key_word):
             redirects = False
             redirect_target = None
 
-            if len(broken_links)<10:
+            if len(broken_links) < MAX_BROKEN_LINK_CHECKS_PER_PAGE:
                 try:
                     resp = requests.head(full_link, timeout=2, verify=False, allow_redirects=False, headers=HEADERS)
                     status_code = resp.status_code
@@ -218,10 +313,14 @@ def parse_html(html_txt,base_url,key_word):
                 "redirect_target": redirect_target,
             })
 
-    canonical_tag_check=""
+    canonical_tag_check = ""
+    is_canonical_self_referencing = True
     canonical_tag = soup.find("link", rel="canonical")
     if canonical_tag and canonical_tag.get("href"):
-        canonical_tag_check=canonical_tag.get("href")
+        canonical_href = urljoin(base_url, canonical_tag.get("href"))
+        canonical_tag_check = canonical_href
+        if canonical_href.rstrip('/') != base_url.rstrip('/'):
+            is_canonical_self_referencing = False
 
     bold_count=len(soup.find_all(["b","strong"]))
     
@@ -282,15 +381,9 @@ def parse_html(html_txt,base_url,key_word):
     if meta_robot_content and "noindex" in meta_robot_content.get("content", "").lower():
         is_crawlable = False
     
-    is_schema_json=False
-    schema_json=soup.find_all("script",type="application/ld+json")
-    if len(schema_json)>0:
-        is_schema_json=True
+    schema_result = validate_structured_data(soup)
 
-    is_hreflang=False
-    hreflang=soup.find_all("link",attrs={"rel":"alternate", "hreflang":True})
-    if len(hreflang)>0:
-        is_hreflang=True
+    hreflang_result = validate_hreflang(soup, base_url)
 
 
     return {"title": title,
@@ -302,6 +395,7 @@ def parse_html(html_txt,base_url,key_word):
             "external_links_count":len(external_links),
             "broken_links_count":len(broken_links),
             "meta_description":meta_content,
+            "meta_description_has_cta": meta_description_has_cta,
             "img_without_alt_tags":img_without_alt_tags,
             "canonical_tag_check":canonical_tag_check,
             "bold_count":bold_count,
@@ -314,13 +408,19 @@ def parse_html(html_txt,base_url,key_word):
             "is_mobile_friendly":is_mobile_friendly,
             "is_safe":is_safe,
             "is_crawlable":is_crawlable,
-            "is_schema_json":is_schema_json,
-            "is_hreflang":is_hreflang,
+            "is_schema_json": schema_result["is_schema_json"],
+            "is_schema_valid": schema_result["is_schema_valid"],
+            "schema_errors": schema_result["schema_errors"],
+            "is_hreflang": hreflang_result["is_hreflang"],
+            "invalid_hreflang_codes": hreflang_result["invalid_hreflang_codes"],
+            "hreflang_entries": hreflang_result["hreflang_entries"],
             "has_mobile_viewport_configuration":has_mobile_viewport_configuration,
             "has_mixed_content":has_mixed_content,
             "all_links": all_links,
-
-            }
+            "poor_quality_alt_tags": poor_quality_alt_tags,
+            "is_canonical_self_referencing": is_canonical_self_referencing,
+            "url_structure_issues": check_url_structure(base_url),
+        }
 
 
 def check_technical_files(base_url):
@@ -417,3 +517,18 @@ def get_robots_parser(base_url):
     except Exception:
         pass  # if robots.txt can't be read, rp.can_fetch will just allow everything by default
     return rp
+
+SOFT_404_INDICATORS = [
+    "page not found", "404 not found", "404 error", "page doesn't exist",
+    "we couldn't find", "cannot be found", "does not exist", "no longer available"
+]
+
+def is_soft_404(status_code, title, h1, word_count):
+    if status_code != 200:
+        return False
+    text_to_check = f"{title} {h1}".lower()
+    if any(indicator in text_to_check for indicator in SOFT_404_INDICATORS):
+        return True
+    if word_count < 50 and ("not found" in text_to_check or "404" in text_to_check):
+        return True
+    return False

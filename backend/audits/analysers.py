@@ -3,9 +3,17 @@ import os
 from dotenv import load_dotenv
 from .models import Audit,CrawledPage,SEOIssues
 from django.db.models import Q
+from collections import Counter
 
 load_dotenv()
 
+
+def classify_link_rel(rel, is_internal):
+    rel_lower = (rel or "").lower()
+    has_sponsored = "sponsored" in rel_lower
+    has_ugc = "ugc" in rel_lower
+    has_nofollow = "nofollow" in rel_lower
+    return has_sponsored, has_ugc, has_nofollow
 
 
 def calculate_on_page_score(title,h1,h2,h3,img_without_alt_tags,meta_description,canonical_tag_check,bold_count,url_structure_char_count,current_url,internal_links,keyword_in_title,keyword_in_h1,keyword_in_meta_description,keyword_density,keyword_in_h2_h3):
@@ -208,6 +216,7 @@ def analyze_link_profile(audit):
             issue_type="WARNING",
             description=f"{empty_count} link(s) found with no anchor text, hurting accessibility and SEO context"
         )
+        
 
     if generic_count > 0:
         pct = round((generic_count / total) * 100, 1)
@@ -232,3 +241,176 @@ def analyze_link_profile(audit):
                 issue_type="WARNING",
                 description=f"{exact_pct}% of external links use exact keyword-match anchor text ('{audit.key_word}'), which can look like an unnatural link pattern"
             )
+
+
+    # Check 4: sponsored/UGC rel attribute misuse
+    internal_sponsored_count = 0
+    internal_ugc_count = 0
+    for link in internal_links:
+        has_sponsored, has_ugc, _ = classify_link_rel(link.rel, link.is_internal)
+        if has_sponsored:
+            internal_sponsored_count += 1
+        if has_ugc:
+            internal_ugc_count += 1
+
+    if internal_sponsored_count > 0:
+        SEOIssues.objects.create(
+            audit=audit, issue_type="WARNING",
+            description=f"{internal_sponsored_count} internal link(s) incorrectly marked rel='sponsored' — this attribute is meant for paid/affiliate external links"
+        )
+    if internal_ugc_count > 0:
+        SEOIssues.objects.create(
+            audit=audit, issue_type="WARNING",
+            description=f"{internal_ugc_count} internal link(s) incorrectly marked rel='ugc' — this attribute is meant for user-generated content links"
+        )
+
+def calculate_technical_score(is_crawlable, is_schema_json, is_hreflang, canonical_tag_check, redirect_chainlength, status_code):
+    score = 0
+    if is_crawlable:
+        score += 30
+    if status_code != 404:
+        score += 20
+    if canonical_tag_check:
+        score += 15
+    if is_schema_json:
+        score += 15
+    if is_hreflang:
+        score += 10
+    if redirect_chainlength <= 1:
+        score += 10
+    elif redirect_chainlength == 2:
+        score += 5
+    return score  # max 100
+
+def calculate_mobile_score(is_mobile_friendly, has_mobile_viewport_configuration, mobile_font_readability, mobile_tap_targets):
+    score = 0
+    if is_mobile_friendly:
+        score += 25
+    if has_mobile_viewport_configuration:
+        score += 25
+    if mobile_font_readability:
+        score += 25
+    if mobile_tap_targets:
+        score += 25
+    return score
+
+
+def calculate_security_score(has_valid_SSL, is_safe, has_strict_transport_security, has_content_security_policy, has_x_frame_options, has_mixed_content):
+    score = 0
+    if has_valid_SSL:
+        score += 25
+    if is_safe:
+        score += 20
+    if has_strict_transport_security:
+        score += 20
+    if has_content_security_policy:
+        score += 20
+    if has_x_frame_options:
+        score += 15
+    if has_mixed_content:
+        score -= 15
+    return max(score, 0)
+
+
+def calculate_overall_score(audit):
+    pages = CrawledPage.objects.filter(audit=audit)
+    count = pages.count()
+    if count == 0:
+        return 0
+
+    # calculate_on_page_score's weights sum to 91, not 100 — normalize here
+    # rather than touching the stored raw value, to avoid disturbing existing data.
+    ON_PAGE_MAX = 91
+
+    on_page_total = performance_total = technical_total = mobile_total = security_total = 0
+
+    for page in pages:
+        on_page_total += min((page.on_page_score or 0) / ON_PAGE_MAX * 100, 100)
+        performance_total += page.performance_score or 0
+        technical_total += page.technical_score or 0
+        mobile_total += calculate_mobile_score(
+            page.is_mobile_friendly, page.has_mobile_viewport_configuration,
+            page.mobile_font_readability, page.mobile_tap_targets
+        )
+        security_total += calculate_security_score(
+            page.has_valid_SSL, page.is_safe, page.has_strict_transport_security,
+            page.has_content_security_policy, page.has_x_frame_options, page.has_mixed_content
+        )
+
+    overall = (
+        (on_page_total / count) * 0.35 +
+        (performance_total / count) * 0.25 +
+        (technical_total / count) * 0.20 +
+        (mobile_total / count) * 0.10 +
+        (security_total / count) * 0.10
+    )
+
+    return round(overall)
+
+from collections import Counter
+
+def analyze_content_uniqueness(audit):
+    from .models import CrawledPage, SEOIssues
+
+    pages = CrawledPage.objects.filter(audit=audit)
+
+    title_map = {}
+    h1_map = {}
+
+    for page in pages:
+        if page.title and page.title != "No title found":
+            title_map.setdefault(page.title, []).append(page.url)
+        if page.h1 and page.h1 != "No h1 tags found":
+            h1_map.setdefault(page.h1, []).append(page.url)
+
+    for title, urls in title_map.items():
+        if len(urls) > 1:
+            shown = ", ".join(urls[:5])
+            SEOIssues.objects.create(
+                audit=audit, issue_type="ERROR",
+                description=f"Duplicate title tag '{title}' found on {len(urls)} pages: {shown}{'...' if len(urls) > 5 else ''}"
+            )
+
+    for h1, urls in h1_map.items():
+        if len(urls) > 1:
+            shown = ", ".join(urls[:5])
+            SEOIssues.objects.create(
+                audit=audit, issue_type="ERROR",
+                description=f"Duplicate H1 tag '{h1}' found on {len(urls)} pages: {shown}{'...' if len(urls) > 5 else ''}"
+            )
+
+def analyze_hreflang_reciprocity(audit):
+    from .models import CrawledPage, SEOIssues
+
+    pages = CrawledPage.objects.filter(audit=audit).exclude(hreflang_data=[])
+    if not pages.exists():
+        return
+
+    # Map every crawled page's URL to itself for quick lookup
+    crawled_urls = {page.url: page for page in pages}
+
+    for page in pages:
+        for entry in page.hreflang_data:
+            target_lang = entry.get("lang")
+            target_href = entry.get("href")
+
+            if target_lang == "x-default" or not target_href:
+                continue
+
+            # Can only validate reciprocity for pages we actually crawled
+            target_page = crawled_urls.get(target_href)
+            if not target_page:
+                continue
+
+            # Target page must have a hreflang entry pointing back to this page
+            has_return_tag = any(
+                back_entry.get("href") == page.url
+                for back_entry in target_page.hreflang_data
+            )
+
+            if not has_return_tag:
+                SEOIssues.objects.create(
+                    audit=audit,
+                    issue_type="WARNING",
+                    description=f"Missing reciprocal hreflang: {page.url} points to {target_href} ({target_lang}), but {target_href} doesn't point back"
+                )

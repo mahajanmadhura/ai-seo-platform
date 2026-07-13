@@ -18,6 +18,7 @@ class Audit(models.Model):
     key_word=models.CharField(max_length=255,null=True,blank=True)
     has_sitemap=models.BooleanField(default=False)
     has_robots=models.BooleanField(default=False)
+    crawl_state = models.JSONField(null=True, blank=True, default=dict)
     
 
 class CrawledPage(models.Model):
@@ -66,6 +67,7 @@ class CrawledPage(models.Model):
     has_content_security_policy=models.BooleanField(default=False)
     has_x_frame_options=models.BooleanField(default=False)
     has_mixed_content=models.BooleanField(default=False)
+    hreflang_data = models.JSONField(null=True, blank=True, default=list)
 
 class SEOIssues(models.Model):
     issue_choices=[

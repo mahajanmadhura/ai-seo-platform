@@ -1,102 +1,150 @@
 from celery import shared_task
 from .models import Audit,CrawledPage,SEOIssues, Link
-from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension
-from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile
+from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension, is_soft_404
+from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile, calculate_technical_score, calculate_overall_score, analyze_content_uniqueness, analyze_hreflang_reciprocity
 import traceback
 from django.utils import timezone
 from django.db import models
 from concurrent.futures import ThreadPoolExecutor
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from urllib.parse import urlparse
 
 
+@shared_task(bind=True, acks_late=True, max_retries=3)
+def run_seo_audit(self, audit_id):
+    audit_website = Audit.objects.get(id=audit_id)
 
-@shared_task
-def run_seo_audit(audit_id):
-    audit_website=Audit.objects.get(id=audit_id)
-    audit_website.status="RUNNING"
-    audit_website.save()
+    resuming = bool(audit_website.crawl_state)
+
+    if resuming:
+        state = audit_website.crawl_state
+        urls_to_visit = [tuple(item) for item in state.get("urls_to_visit", [])]
+        visited_urls = set(state.get("visited_urls", []))
+        queued_urls = set(state.get("queued_urls", []))
+        print(f"Resuming audit {audit_id}: {len(visited_urls)} pages already claimed")
+        print(f"The number of pages already visited is {visited_urls} and the urls that are to be visited is {queued_urls}")
+    else:
+        audit_website.status = "RUNNING"
+        audit_website.save()
+        urls_to_visit = [(audit_website.website.url, 0)]  # (url, depth) — homepage is depth 0
+        visited_urls = set()
+        queued_urls = {audit_website.website.url}
+
     print(f"We are going to audit the website with id {audit_id}")
 
-    urls_to_visit=[(audit_website.website.url, 0)]  # (url, depth) — homepage is depth 0
-    visited_urls=set()
-    queued_urls = {audit_website.website.url}
-
-    robots,sitemap=check_technical_files(audit_website.website.url)
-    audit_website.has_robots=robots
-    audit_website.has_sitemap=sitemap
-    audit_website.save()
     robots_parser = get_robots_parser(audit_website.website.url)
 
-    if not robots:
-        SEOIssues.objects.create(
-            audit=audit_website,
-            issue_type="ERROR",
-            description="'robots.txt' couldnt be found"
-        )
-    if not sitemap:
-        SEOIssues.objects.create(
-            audit=audit_website,
-            issue_type="WARNING",
-            description="'sitemap.txt' couldnt be found"
-        )
-    
-    if sitemap:
-        sitemap_urls = parse_sitemap(audit_website.website.url)
-        for sitemap_url in sitemap_urls:
-            if (sitemap_url not in queued_urls
-                and not is_disallowed(sitemap_url)
-                and is_allowed_extension(sitemap_url)
-                and robots_parser.can_fetch(HEADERS["User-Agent"], sitemap_url)):
-                urls_to_visit.append((sitemap_url, 0))
-                queued_urls.add(sitemap_url)
+    if not resuming:
+        robots, sitemap = check_technical_files(audit_website.website.url)
+        audit_website.has_robots = robots
+        audit_website.has_sitemap = sitemap
+        audit_website.save()
 
+        if not robots:
+            SEOIssues.objects.create(
+                audit=audit_website,
+                issue_type="ERROR",
+                description="'robots.txt' couldnt be found"
+            )
+        if not sitemap:
+            SEOIssues.objects.create(
+                audit=audit_website,
+                issue_type="WARNING",
+                description="'sitemap.txt' couldnt be found"
+            )
+
+        if sitemap:
+            sitemap_urls = parse_sitemap(audit_website.website.url)
+            for sitemap_url in sitemap_urls:
+                if (sitemap_url not in queued_urls
+                    and not is_disallowed(sitemap_url)
+                    and is_allowed_extension(sitemap_url)
+                    and robots_parser.can_fetch(HEADERS["User-Agent"], sitemap_url)):
+                    urls_to_visit.append((sitemap_url, 0))
+                    queued_urls.add(sitemap_url)
 
     CONCURRENT_REQUESTS = 10  # matches your spec's crawler config
-
     MAX_DEPTH = 5  # matches your spec
+    try:
+        MAX_PAGES = 500
+        while urls_to_visit and len(visited_urls) < MAX_PAGES:
+            batch = []
+            while urls_to_visit and len(batch) < CONCURRENT_REQUESTS and len(visited_urls) < MAX_PAGES:
+                url, depth = urls_to_visit.pop(0)
+                if url not in visited_urls:
+                    batch.append((url, depth))
+                    visited_urls.add(url)
 
-    while urls_to_visit and len(visited_urls) <= 500:
-        batch = []
-        while urls_to_visit and len(batch) < CONCURRENT_REQUESTS:
-            url, depth = urls_to_visit.pop(0)
-            if url not in visited_urls:
-                batch.append((url, depth))
-                visited_urls.add(url)
+            if not batch:
+                break
 
-        if not batch:
-            break
+            audit_website.crawl_state = {
+                "urls_to_visit": urls_to_visit,
+                "visited_urls": list(visited_urls),
+                "queued_urls": list(queued_urls),
+            }
+            audit_website.save(update_fields=["crawl_state"])
 
-        with ThreadPoolExecutor(max_workers=CONCURRENT_REQUESTS) as executor:
-            results = executor.map(lambda item: process_page(item[0], audit_website), batch)
+            with ThreadPoolExecutor(max_workers=CONCURRENT_REQUESTS) as executor:
+                results = executor.map(lambda item: process_page(item[0], audit_website), batch)
 
-        for (url, depth), new_links in zip(batch, results):
-            if depth < MAX_DEPTH:
-                for link in new_links:
-                    if (link not in queued_urls
-                        and not is_disallowed(link)
-                        and is_allowed_extension(link)
-                        and robots_parser.can_fetch(HEADERS["User-Agent"], link)):
-                        urls_to_visit.append((link, depth + 1))
-                        queued_urls.add(link)
+            for (url, depth), new_links in zip(batch, results):
+                if depth < MAX_DEPTH:
+                    for link in new_links:
+                        if (link not in queued_urls
+                            and not is_disallowed(link)
+                            and is_allowed_extension(link)
+                            and robots_parser.can_fetch(HEADERS["User-Agent"], link)):
+                            urls_to_visit.append((link, depth + 1))
+                            queued_urls.add(link)
 
-        send_progress(audit_id, {"pages_crawled": len(visited_urls)})  # from step 2 below
-        
-    
+            send_progress(audit_id, {"pages_crawled": len(visited_urls)})
 
-    if len(visited_urls)>0:
-        analyze_link_profile(audit_website)
-        ai_response=generate_ai_recommendations(audit_website)
-        audit_website.ai_recommendation=ai_response
+    except Exception as e:
+        print(f"Audit {audit_id} crashed: {e}")
+        traceback.print_exc()
+        audit_website.crawl_state = {
+            "urls_to_visit": urls_to_visit,
+            "visited_urls": list(visited_urls),
+            "queued_urls": list(queued_urls),
+        }
+        audit_website.save(update_fields=["crawl_state"])
+        try:
+            raise self.retry(exc=e, countdown=30)
+        except self.MaxRetriesExceededError:
+            audit_website.status = "FAILED"
+            audit_website.crawl_state = {}
+            audit_website.save()
+            return f"Audit {audit_id} failed permanently after {self.max_retries} retries: {e}"
+
+    if len(visited_urls) > 0:
+        try:
+            analyze_link_profile(audit_website)
+            analyze_external_link_quality(audit_website)
+            analyze_content_uniqueness(audit_website)
+            analyze_hreflang_reciprocity(audit_website)
+        except Exception as e:
+            print(f"Post-crawl analysis failed for audit {audit_id}: {e}")
+            traceback.print_exc()
+
+        try:
+            ai_response = generate_ai_recommendations(audit_website)
+        except Exception as e:
+            print(f"AI recommendation generation failed for audit {audit_id}: {e}")
+            traceback.print_exc()
+            ai_response = "AI recommendations could not be generated at this time."
+
+        audit_website.ai_recommendation = ai_response
+        audit_website.overall_Score = calculate_overall_score(audit_website)
         audit_website.completed_at = timezone.now()
         audit_website.total_pages = len(visited_urls)
         audit_website.total_issues = SEOIssues.objects.filter(models.Q(audit=audit_website) | models.Q(url__audit=audit_website)).count()
-        audit_website.status="DONE"
-
+        audit_website.status = "DONE"
     else:
-        audit_website.status="FAILED"
+        audit_website.status = "FAILED"
 
-    
+    audit_website.crawl_state = {}
     audit_website.save()
 
     return f"Audit Complete! Crawled through {len(visited_urls)} pages"
@@ -121,6 +169,9 @@ def core_web_vitals_analysis(page_id):
     page.time_to_first_byte=core_web_vitals["ttfb"]
     page.first_contentful_paint=core_web_vitals["fcp"]
     page.core_web_vitals_performance_score=core_web_vitals_performance_score
+    page.mobile_font_readability = core_web_vitals["mobile_font_readability"]
+    page.mobile_tap_targets = core_web_vitals["mobile_tap_targets"]
+    
     
     page.save()
     
@@ -173,58 +224,83 @@ def core_web_vitals_analysis(page_id):
 
 
 def process_page(current_url, audit_website):
-    print(f"Crawling: {current_url}")
-    status_code, html_text, load_time, redirect_chainlength, has_valid_SSL, has_strict_transport_security, has_content_security_policy, has_x_frame_options = fetch_url(current_url)
-    result_of_parse = parse_html(html_text, current_url, audit_website.key_word)
-    performance_score = calculate_performance_score(load_time)
+    try:
+        print(f"Crawling: {current_url}")
+        (status_code, html_text, load_time, redirect_chainlength, has_valid_SSL,
+         has_strict_transport_security, has_content_security_policy, has_x_frame_options,
+         is_redirect_loop, x_robots_noindex) = fetch_url(current_url)
 
-    score = calculate_on_page_score(
-        result_of_parse["title"], result_of_parse["h1"], result_of_parse["h2"],
-        result_of_parse["h3"], result_of_parse["img_without_alt_tags"],
-        result_of_parse["meta_description"], result_of_parse["canonical_tag_check"],
-        result_of_parse["bold_count"], result_of_parse["url_structure_char_count"],
-        current_url, result_of_parse["internal_links"], result_of_parse["keyword_in_title"],
-        result_of_parse["keyword_in_h1"], result_of_parse["keyword_in_meta_description"],
-        result_of_parse["keyword_density"], result_of_parse["keyword_in_h2_h3"],
-    )
+        result_of_parse = parse_html(html_text, current_url, audit_website.key_word)
+        performance_score = calculate_performance_score(load_time)
 
-    new_page = CrawledPage.objects.create(
-        audit=audit_website, url=current_url, status_code=status_code,
-        title=result_of_parse["title"], h1=result_of_parse["h1"], h2=result_of_parse["h2"],
-        h3=result_of_parse["h3"], meta_description=result_of_parse["meta_description"],
-        word_count=result_of_parse["word_count"], load_time=load_time, on_page_score=score,
-        img_without_alt_tags=result_of_parse["img_without_alt_tags"],
-        canonical_tag_check=result_of_parse["canonical_tag_check"],
-        bold_count=result_of_parse["bold_count"],
-        url_structure_char_count=result_of_parse["url_structure_char_count"],
-        keyword_in_title=result_of_parse["keyword_in_title"],
-        keyword_density=result_of_parse["keyword_density"],
-        keyword_in_h1=result_of_parse["keyword_in_h1"],
-        keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
-        keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
-        is_mobile_friendly=result_of_parse["is_mobile_friendly"],
-        is_safe=result_of_parse["is_safe"], performance_score=performance_score,
-        redirect_chainlength=redirect_chainlength,
-        is_crawlable=result_of_parse.get("is_crawlable", False),
-        is_schema_json=result_of_parse.get("is_schema_json", False),
-        is_hreflang=result_of_parse.get("is_hreflang", False),
-        external_links_count=result_of_parse["external_links_count"],
-        broken_links_count=result_of_parse["broken_links_count"],
-        has_mobile_viewport_configuration=result_of_parse["has_mobile_viewport_configuration"],
-        has_valid_SSL=has_valid_SSL, has_strict_transport_security=has_strict_transport_security,
-        has_content_security_policy=has_content_security_policy, has_x_frame_options=has_x_frame_options,
-        has_mixed_content=result_of_parse["has_mixed_content"],
-    )
+        # Combine header-level noindex with the meta-tag-based crawlability check
+        is_crawlable = result_of_parse.get("is_crawlable", False) and not x_robots_noindex
+        result_of_parse["is_crawlable"] = is_crawlable
 
-    for link_data in result_of_parse["all_links"]:
-        Link.objects.create(page=new_page, **link_data)
+        score = calculate_on_page_score(
+            result_of_parse["title"], result_of_parse["h1"], result_of_parse["h2"],
+            result_of_parse["h3"], result_of_parse["img_without_alt_tags"],
+            result_of_parse["meta_description"], result_of_parse["canonical_tag_check"],
+            result_of_parse["bold_count"], result_of_parse["url_structure_char_count"],
+            current_url, result_of_parse["internal_links"], result_of_parse["keyword_in_title"],
+            result_of_parse["keyword_in_h1"], result_of_parse["keyword_in_meta_description"],
+            result_of_parse["keyword_density"], result_of_parse["keyword_in_h2_h3"],
+        )
 
-    core_web_vitals_analysis.delay(new_page.id)
-    create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
-                       has_valid_SSL, has_strict_transport_security,
-                       has_content_security_policy, has_x_frame_options, load_time)
+        technical_score = calculate_technical_score(
+            result_of_parse.get("is_crawlable", False),
+            result_of_parse.get("is_schema_json", False),
+            result_of_parse.get("is_hreflang", False),
+            result_of_parse["canonical_tag_check"],
+            redirect_chainlength,
+            status_code,
+        )
 
-    return result_of_parse["internal_links"]
+        new_page = CrawledPage.objects.create(
+            audit=audit_website, url=current_url, status_code=status_code,
+            status_code404=(status_code == 404),
+            technical_score=technical_score,
+            title=result_of_parse["title"], h1=result_of_parse["h1"], h2=result_of_parse["h2"],
+            h3=result_of_parse["h3"], meta_description=result_of_parse["meta_description"],
+            word_count=result_of_parse["word_count"], load_time=load_time, on_page_score=score,
+            img_without_alt_tags=result_of_parse["img_without_alt_tags"],
+            canonical_tag_check=result_of_parse["canonical_tag_check"],
+            bold_count=result_of_parse["bold_count"],
+            url_structure_char_count=result_of_parse["url_structure_char_count"],
+            keyword_in_title=result_of_parse["keyword_in_title"],
+            keyword_density=result_of_parse["keyword_density"],
+            keyword_in_h1=result_of_parse["keyword_in_h1"],
+            keyword_in_meta_description=result_of_parse["keyword_in_meta_description"],
+            keyword_in_h2_h3=result_of_parse["keyword_in_h2_h3"],
+            is_mobile_friendly=result_of_parse["is_mobile_friendly"],
+            is_safe=result_of_parse["is_safe"], performance_score=performance_score,
+            redirect_chainlength=redirect_chainlength,
+            is_crawlable=result_of_parse.get("is_crawlable", False),
+            is_schema_json=result_of_parse.get("is_schema_json", False),
+            is_hreflang=result_of_parse.get("is_hreflang", False),
+            external_links_count=result_of_parse["external_links_count"],
+            broken_links_count=result_of_parse["broken_links_count"],
+            has_mobile_viewport_configuration=result_of_parse["has_mobile_viewport_configuration"],
+            has_valid_SSL=has_valid_SSL, has_strict_transport_security=has_strict_transport_security,
+            has_content_security_policy=has_content_security_policy, has_x_frame_options=has_x_frame_options,
+            has_mixed_content=result_of_parse["has_mixed_content"],
+            hreflang_data=result_of_parse.get("hreflang_entries", []),
+        )
+
+        for link_data in result_of_parse["all_links"]:
+            Link.objects.create(page=new_page, **link_data)
+
+        core_web_vitals_analysis.delay(new_page.id)
+        create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
+                           has_valid_SSL, has_strict_transport_security,
+                           has_content_security_policy, has_x_frame_options, load_time, is_redirect_loop, x_robots_noindex)
+
+        return result_of_parse["internal_links"]
+
+    except Exception as e:
+        print(f"Failed to process {current_url}: {e}")
+        traceback.print_exc()
+        return []  # no internal links discovered from a page we couldn't process
 
 def send_progress(audit_id, data):
     channel_layer = get_channel_layer()
@@ -235,7 +311,7 @@ def send_progress(audit_id, data):
 
 def create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
                        has_valid_SSL, has_strict_transport_security,
-                       has_content_security_policy, has_x_frame_options, load_time):
+                       has_content_security_policy, has_x_frame_options, load_time, is_redirect_loop, x_robots_noindex):
     try:
         if result_of_parse["h1"]=="No h1 tags found":
             SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing h1 tag on {new_page.url}")
@@ -252,11 +328,31 @@ def create_seo_issues(new_page, result_of_parse, status_code, redirect_chainleng
         if result_of_parse["word_count"]==0:
             SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"There are no words on the website: {new_page.url}")
 
-        if result_of_parse["meta_description"]=="No meta description":
-            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing meta description tag on {new_page.url}")
-
+        if result_of_parse["meta_description"] != "No meta description" and not result_of_parse["meta_description_has_cta"]:
+            SEOIssues.objects.create(
+                url=new_page, issue_type="NOTICE",
+                description=f"Meta description has no clear call-to-action on {new_page.url}"
+            )
         if result_of_parse["canonical_tag_check"]=="":
             SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Missing canonical tag on {new_page.url}")
+
+        if len(result_of_parse["poor_quality_alt_tags"]) > 0:
+            SEOIssues.objects.create(
+                url=new_page, issue_type="WARNING",
+                description=f"{len(result_of_parse['poor_quality_alt_tags'])} image(s) have non-descriptive alt text (e.g. 'image1.jpg', 'photo') on {new_page.url}"
+            )
+        if result_of_parse["canonical_tag_check"] and not result_of_parse["is_canonical_self_referencing"]:
+            SEOIssues.objects.create(
+                url=new_page, issue_type="WARNING",
+                description=f"Canonical tag points to a different URL ({result_of_parse['canonical_tag_check']}) than the page itself on {new_page.url}"
+            )
+        
+        if result_of_parse["url_structure_issues"]:
+            issues_text = ", ".join(result_of_parse["url_structure_issues"])
+            SEOIssues.objects.create(
+                url=new_page, issue_type="WARNING",
+                description=f"URL structure issues ({issues_text}) on {new_page.url}"
+            )
 
         if result_of_parse["bold_count"]==0:
             SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"No bold tags found on {new_page.url}")
@@ -285,9 +381,14 @@ def create_seo_issues(new_page, result_of_parse, status_code, redirect_chainleng
         if not result_of_parse["is_schema_json"]:
             SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"There are no Schema Json tags on the website at {new_page.url}")
 
-        if not result_of_parse["is_hreflang"]:
-            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"The website doesnt have hreflang tags at {new_page.url}")
-
+        if result_of_parse["is_schema_json"] and not result_of_parse["is_schema_valid"]:
+            errors_text = "; ".join(result_of_parse["schema_errors"][:3])
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"Structured data has validation issues ({errors_text}) on {new_page.url}")
+            
+        if result_of_parse["is_hreflang"] and result_of_parse["invalid_hreflang_codes"]:
+            codes_text = ", ".join(result_of_parse["invalid_hreflang_codes"])
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"Invalid hreflang language code(s) ({codes_text}) on {new_page.url}")
+            
         if not result_of_parse["has_mobile_viewport_configuration"]:
             SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"The website doesnt have proper mobile viewport configuration at {new_page.url}")
 
@@ -305,7 +406,58 @@ def create_seo_issues(new_page, result_of_parse, status_code, redirect_chainleng
 
         if result_of_parse["has_mixed_content"]:
             SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"The website has mixed content (HTTPS pages loading HTTP resources) at {new_page.url}")
+        
+        if result_of_parse["h1"] != "No h1 tags found":
+            h1_len = len(result_of_parse["h1"])
+            if h1_len < 20 or h1_len > 70:
+                SEOIssues.objects.create(
+                    url=new_page, issue_type="WARNING",
+                    description=f"H1 tag length ({h1_len} chars) is outside the recommended 20-70 character range on {new_page.url}"
+                )
+        if is_redirect_loop:
+            SEOIssues.objects.create(url=new_page, issue_type="ERROR", description=f"Redirect loop detected on {new_page.url}")
+
+        if x_robots_noindex:
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"X-Robots-Tag header contains 'noindex' directive on {new_page.url}")
+        
+        if is_soft_404(status_code, result_of_parse["title"], result_of_parse["h1"], result_of_parse["word_count"]):
+            SEOIssues.objects.create(url=new_page, issue_type="WARNING", description=f"Possible soft 404 detected — page returns 200 but content suggests 'not found' on {new_page.url}")
 
     except Exception as e:
         print(f"Issue creation failed for {new_page.url}, Error: {e}")
         traceback.print_exc()
+
+
+def analyze_external_link_quality(audit):
+    from .models import Link, SEOIssues
+
+    external_links = Link.objects.filter(page__audit=audit, is_internal=False)
+    total_external = external_links.count()
+    if total_external == 0:
+        return
+
+    domain_counts = {}
+    insecure_count = 0
+    for link in external_links:
+        if not link.target_url:
+            continue
+        domain = urlparse(link.target_url).netloc
+        domain_counts[domain] = domain_counts.get(domain, 0) + 1
+        if link.target_url.startswith("http://"):
+            insecure_count += 1
+
+    if domain_counts:
+        top_domain, top_count = max(domain_counts.items(), key=lambda x: x[1])
+        top_pct = round((top_count / total_external) * 100, 1)
+        if top_pct > 40 and len(domain_counts) > 1:
+            SEOIssues.objects.create(
+                audit=audit, issue_type="WARNING",
+                description=f"{top_pct}% of external links point to a single domain ({top_domain}), which can look like an unnatural linking pattern"
+            )
+
+    if insecure_count > 0:
+        pct = round((insecure_count / total_external) * 100, 1)
+        SEOIssues.objects.create(
+            audit=audit, issue_type="NOTICE",
+            description=f"{insecure_count} external link(s) ({pct}%) point to non-HTTPS URLs"
+        )
