@@ -221,7 +221,7 @@ def run_seo_audit(self, audit_id):
         return f"Audit {audit_id} failed — no pages could be crawled"
 
         
-@shared_task
+@shared_task(rate_limit="1/s")
 def core_web_vitals_analysis(page_id):
     page=CrawledPage.objects.get(id=page_id)
     current_url=page.url

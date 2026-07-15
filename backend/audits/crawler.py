@@ -486,6 +486,8 @@ def fetch_core_web_vitals(url):
         
         # 1. Safely drill down to the "audits" folder. If anything is missing, return an empty dict {}
         audits = data.get("lighthouseResult", {}).get("audits", {})
+        print(f"DEBUG: font-size audit = {audits.get('font-size')}")
+        print(f"DEBUG: tap-targets audit = {audits.get('tap-targets')}")
         
         # 2. Safely grab the LCP numericValue. If it's missing, default to 0!
         lcp_raw = audits.get("largest-contentful-paint", {}).get("numericValue", 0)
