@@ -1,4 +1,4 @@
-from celery import shared_task
+from celery import shared_task, chord
 from .models import Audit,CrawledPage,SEOIssues, Link
 from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension, is_soft_404
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile, calculate_technical_score, calculate_overall_score, analyze_content_uniqueness, analyze_hreflang_reciprocity
@@ -11,6 +11,44 @@ from asgiref.sync import async_to_sync
 from urllib.parse import urlparse
 
 
+@shared_task
+def finalize_audit(cwv_results, audit_id):
+    """
+    Runs only after ALL core_web_vitals_analysis tasks for this audit
+    have finished. cwv_results is just a list of their return values —
+    we don't need it, it's passed automatically by the chord.
+    """
+    audit_website = Audit.objects.get(id=audit_id)
+    visited_count = audit_website.total_pages  # we'll set this before the chord starts
+
+    try:
+        analyze_link_profile(audit_website)
+        analyze_external_link_quality(audit_website)
+        analyze_content_uniqueness(audit_website)
+        analyze_hreflang_reciprocity(audit_website)
+    except Exception as e:
+        print(f"Post-crawl analysis failed for audit {audit_id}: {e}")
+        traceback.print_exc()
+
+    # TODO(teammate): implement AI recommendation generation here.
+    # This used to call generate_ai_recommendations(audit_website) from analysers.py —
+    # that function is still there if you want a starting point, otherwise feel free
+    # to replace it entirely. Just make sure this sets audit_website.ai_recommendation
+    # to something (a string) before the audit is marked DONE below.
+    audit_website.ai_recommendation = "AI recommendations coming soon."
+
+    audit_website.overall_Score = calculate_overall_score(audit_website)
+    audit_website.completed_at = timezone.now()
+    audit_website.total_issues = SEOIssues.objects.filter(
+        models.Q(audit=audit_website) | models.Q(url__audit=audit_website)
+    ).count()
+    audit_website.status = "DONE"
+    audit_website.crawl_state = {}
+    audit_website.save()
+
+    return f"Audit Complete! Crawled through {visited_count} pages"
+
+    
 @shared_task(bind=True, acks_late=True, max_retries=3)
 def run_seo_audit(self, audit_id):
     audit_website = Audit.objects.get(id=audit_id)
@@ -67,7 +105,7 @@ def run_seo_audit(self, audit_id):
     CONCURRENT_REQUESTS = 10  # matches your spec's crawler config
     MAX_DEPTH = 5  # matches your spec
     try:
-        MAX_PAGES = 500
+        MAX_PAGES = 10
         while urls_to_visit and len(visited_urls) < MAX_PAGES:
             batch = []
             while urls_to_visit and len(batch) < CONCURRENT_REQUESTS and len(visited_urls) < MAX_PAGES:
@@ -119,35 +157,29 @@ def run_seo_audit(self, audit_id):
             return f"Audit {audit_id} failed permanently after {self.max_retries} retries: {e}"
 
     if len(visited_urls) > 0:
-        try:
-            analyze_link_profile(audit_website)
-            analyze_external_link_quality(audit_website)
-            analyze_content_uniqueness(audit_website)
-            analyze_hreflang_reciprocity(audit_website)
-        except Exception as e:
-            print(f"Post-crawl analysis failed for audit {audit_id}: {e}")
-            traceback.print_exc()
-
-        try:
-            ai_response = generate_ai_recommendations(audit_website)
-        except Exception as e:
-            print(f"AI recommendation generation failed for audit {audit_id}: {e}")
-            traceback.print_exc()
-            ai_response = "AI recommendations could not be generated at this time."
-
-        audit_website.ai_recommendation = ai_response
-        audit_website.overall_Score = calculate_overall_score(audit_website)
-        audit_website.completed_at = timezone.now()
         audit_website.total_pages = len(visited_urls)
-        audit_website.total_issues = SEOIssues.objects.filter(models.Q(audit=audit_website) | models.Q(url__audit=audit_website)).count()
-        audit_website.status = "DONE"
+        audit_website.save(update_fields=["total_pages"])
+
+        page_ids = list(
+            CrawledPage.objects.filter(audit=audit_website).values_list("id", flat=True)
+        )
+
+        # Run a CWV check for every page in parallel, then call finalize_audit
+        # once ALL of them are done — not before.
+        chord(
+            [core_web_vitals_analysis.s(pid) for pid in page_ids]
+        )(finalize_audit.s(audit_id))
+
+        # NOTE: don't set status = "DONE" here anymore — finalize_audit does that.
+        audit_website.crawl_state = {}
+        audit_website.save(update_fields=["crawl_state"])
+
+        return f"Crawl complete for audit {audit_id}, waiting on {len(page_ids)} CWV checks"
     else:
         audit_website.status = "FAILED"
-
-    audit_website.crawl_state = {}
-    audit_website.save()
-
-    return f"Audit Complete! Crawled through {len(visited_urls)} pages"
+        audit_website.crawl_state = {}
+        audit_website.save()
+        return f"Audit {audit_id} failed — no pages could be crawled"
 
         
 @shared_task
@@ -290,7 +322,6 @@ def process_page(current_url, audit_website):
         for link_data in result_of_parse["all_links"]:
             Link.objects.create(page=new_page, **link_data)
 
-        core_web_vitals_analysis.delay(new_page.id)
         create_seo_issues(new_page, result_of_parse, status_code, redirect_chainlength,
                            has_valid_SSL, has_strict_transport_security,
                            has_content_security_policy, has_x_frame_options, load_time, is_redirect_loop, x_robots_noindex)
@@ -461,3 +492,4 @@ def analyze_external_link_quality(audit):
             audit=audit, issue_type="NOTICE",
             description=f"{insecure_count} external link(s) ({pct}%) point to non-HTTPS URLs"
         )
+

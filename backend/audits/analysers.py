@@ -317,10 +317,8 @@ def calculate_overall_score(audit):
     count = pages.count()
     if count == 0:
         return 0
-
-    # calculate_on_page_score's weights sum to 91, not 100 — normalize here
-    # rather than touching the stored raw value, to avoid disturbing existing data.
-    ON_PAGE_MAX = 91
+    
+    ON_PAGE_MAX = 90
 
     on_page_total = performance_total = technical_total = mobile_total = security_total = 0
 
@@ -346,8 +344,6 @@ def calculate_overall_score(audit):
     )
 
     return round(overall)
-
-from collections import Counter
 
 def analyze_content_uniqueness(audit):
     from .models import CrawledPage, SEOIssues

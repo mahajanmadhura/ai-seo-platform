@@ -84,7 +84,7 @@ class SEOIssues(models.Model):
 
 class Link(models.Model):
     page = models.ForeignKey(CrawledPage, on_delete=models.CASCADE, related_name='links')
-    target_url = models.URLField(blank=True, null=True)
+    target_url = models.URLField(blank=True, null=True, max_length=2048)
     anchor_text = models.CharField(max_length=255, null=True, blank=True)
     rel = models.CharField(max_length=255, null=True, blank=True)
     is_internal = models.BooleanField(default=False)

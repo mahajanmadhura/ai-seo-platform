@@ -10,13 +10,13 @@ import xml.etree.ElementTree as ET
 
 DISALLOWED_PATHS = ['/admin', '/login', '/cart', '/checkout']
 HEADERS = {"User-Agent": "AI-SEO-Audit-Bot/1.0"}
-ALLOWED_EXTENSIONS = ['.html', '.php', '.asp', '/']
+ALLOWED_EXTENSIONS = ['.html', '.htm', '.php', '.asp', '.aspx', '.jsp', '/']
 MAX_REDIRECTS = 5
 REQUEST_TIMEOUT = 30
 CTA_PHRASES = ["learn more", "shop now", "get started", "buy now", "sign up", "read more",
                "discover", "explore", "contact us", "try", "download", "subscribe",
                "book now", "order now", "join", "call now"]
-MAX_BROKEN_LINK_CHECKS_PER_PAGE = 30  # was 10 — synchronous HEAD requests per page, keep bounded
+MAX_BROKEN_LINK_CHECKS_PER_PAGE = 30  
 HREFLANG_PATTERN = re.compile(r'^[a-z]{2}(-[A-Z]{2})?$|^x-default$')
 
 def validate_hreflang(soup, base_url):
@@ -122,7 +122,7 @@ def parse_sitemap(base_url):
 
 def is_disallowed(url):
     path = urlparse(url).path.lower()
-    return any(path.startswith(blocked) for blocked in DISALLOWED_PATHS)
+    return any(path == blocked or path.startswith(blocked + "/") for blocked in DISALLOWED_PATHS)
 
 def is_allowed_extension(url):
     path = urlparse(url).path.lower()
@@ -185,6 +185,9 @@ def fetch_url(url):
 
 def parse_html(html_txt,base_url,key_word):
     soup=BeautifulSoup(html_txt,'html.parser')
+
+    for tag in soup(["script", "style"]):
+        tag.decompose()
 
     if soup.find("title")==None:
         title= "No title found"
@@ -258,6 +261,15 @@ def parse_html(html_txt,base_url,key_word):
                 if re.match(url_pattern, script_src):
                     has_mixed_content = True
                     break  # Exit loop early
+                
+            # 3. Check <img>, <link>, and <iframe> src/href attributes too
+            if not has_mixed_content:
+                resource_tags = soup.find_all(["img", "link", "iframe"])
+                for tag in resource_tags:
+                    resource_url = tag.get("src") or tag.get("href")
+                    if resource_url and resource_url.startswith("http://"):
+                        has_mixed_content = True
+                        break
 
     
 
@@ -475,8 +487,8 @@ def fetch_core_web_vitals(url):
         fid_raw = audits.get("total-blocking-time",{}).get("numericValue",0)
 
         #Mobile SEO analysis
-        font_score = audits.get("font-size",{}).get("numericValue",0)
-        tap_score = audits.get("tap-targets",{}).get("numericValue",0)
+        font_score = audits.get("font-size",{}).get("score",0)
+        tap_score = audits.get("tap-targets",{}).get("score",0)
         viewport_audit = audits.get("viewport", {})
 
         return {
