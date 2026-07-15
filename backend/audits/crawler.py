@@ -18,6 +18,14 @@ CTA_PHRASES = ["learn more", "shop now", "get started", "buy now", "sign up", "r
                "book now", "order now", "join", "call now"]
 MAX_BROKEN_LINK_CHECKS_PER_PAGE = 30  
 HREFLANG_PATTERN = re.compile(r'^[a-z]{2}(-[A-Z]{2})?$|^x-default$')
+CSR_ROOT_INDICATORS = ['id="root"', 'id="app"', 'id="__next"', 'id="___gatsby"']
+DNS_BLOCK_INDICATORS = [
+    "fortinet", "secure dns service", "this website is blocked",
+    "access to this site has been restricted", "blocked by your network administrator",
+    "web filter", "opendns", "cisco umbrella", "this domain has been blocked",
+    "content filtering", "network policy", "category: blocked"
+]
+
 
 def validate_hreflang(soup, base_url):
     hreflang_tags = soup.find_all("link", attrs={"rel": "alternate", "hreflang": True})
@@ -261,7 +269,7 @@ def parse_html(html_txt,base_url,key_word):
                 if re.match(url_pattern, script_src):
                     has_mixed_content = True
                     break  # Exit loop early
-                
+
             # 3. Check <img>, <link>, and <iframe> src/href attributes too
             if not has_mixed_content:
                 resource_tags = soup.find_all(["img", "link", "iframe"])
@@ -467,7 +475,7 @@ def check_technical_files(base_url):
 
 
 def fetch_core_web_vitals(url):
-    api_url=f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&strategy=mobile"
+    api_url=f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&strategy=mobile&category=performance&category=accessibility&category=seo"
     api_key=os.environ.get("PAGESPEED_API_KEY")
     if api_key:
         api_url+=f"&key={api_key}"
@@ -487,9 +495,8 @@ def fetch_core_web_vitals(url):
         fid_raw = audits.get("total-blocking-time",{}).get("numericValue",0)
 
         #Mobile SEO analysis
-        font_score = audits.get("font-size",{}).get("score",0)
-        tap_score = audits.get("tap-targets",{}).get("score",0)
-        viewport_audit = audits.get("viewport", {})
+        font_score = audits.get("font-size",{}).get("score",0) or 0
+        tap_score = audits.get("tap-targets",{}).get("score",0) or 0
 
         return {
             "lcp": round(lcp_raw / 1000, 2), # Convert ms to s, and round to 2 decimals
@@ -544,3 +551,29 @@ def is_soft_404(status_code, title, h1, word_count):
     if word_count < 50 and ("not found" in text_to_check or "404" in text_to_check):
         return True
     return False
+
+
+def is_likely_client_rendered(soup, html_txt, word_count):
+    """
+    Heuristic check: does this page look like a JavaScript-rendered app
+    (React/Vue/Next.js/etc.) rather than server-rendered HTML we can
+    meaningfully crawl and audit?
+    Not 100% reliable — just a best-effort guess based on common patterns.
+    """
+    if word_count > 50:
+        return False  # has real visible text — probably fine to crawl normally
+
+    script_count = len(soup.find_all("script"))
+    has_csr_root = any(indicator in html_txt for indicator in CSR_ROOT_INDICATORS)
+
+    return script_count >= 3 and (has_csr_root or word_count < 10)
+
+def is_dns_blocked(html_txt):
+    """
+    Heuristic check: does this page look like a DNS-level or network-level
+    blocker's warning page instead of the real site content?
+    """
+    if not html_txt:
+        return False
+    text_lower = html_txt.lower()
+    return any(indicator in text_lower for indicator in DNS_BLOCK_INDICATORS)

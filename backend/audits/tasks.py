@@ -74,6 +74,45 @@ def run_seo_audit(self, audit_id):
     robots_parser = get_robots_parser(audit_website.website.url)
 
     if not resuming:
+        from .crawler import is_likely_client_rendered, is_dns_blocked
+        from bs4 import BeautifulSoup
+
+        precheck_status, precheck_html, *_ = fetch_url(audit_website.website.url)
+
+        if precheck_status == 0:
+            print(f"⚠️  Audit {audit_id}: {audit_website.website.url} could not be reached at all (connection failed). Skipping audit.")
+            SEOIssues.objects.create(
+                audit=audit_website, issue_type="ERROR",
+                description="The website could not be reached — it may be down, blocking automated requests, or the URL may be incorrect."
+            )
+            audit_website.status = "FAILED"
+            audit_website.save()
+            return f"Audit {audit_id} skipped — website unreachable"
+
+        if is_dns_blocked(precheck_html):
+            print(f"⚠️  Audit {audit_id}: {audit_website.website.url} appears to be blocked by a DNS/network-level filter (e.g. Fortinet, OpenDNS). Skipping audit.")
+            SEOIssues.objects.create(
+                audit=audit_website, issue_type="ERROR",
+                description="This website appears to be blocked by a DNS or network-level content filter on the crawler's network, not an issue with the website itself. Try running the audit from a different network."
+            )
+            audit_website.status = "FAILED"
+            audit_website.save()
+            return f"Audit {audit_id} skipped — blocked by DNS/network filter"
+
+        precheck_soup = BeautifulSoup(precheck_html, 'html.parser') if precheck_html else None
+        precheck_word_count = len(precheck_soup.get_text().split()) if precheck_soup and precheck_soup.get_text() else 0
+
+        if precheck_soup and is_likely_client_rendered(precheck_soup, precheck_html, precheck_word_count):
+            print(f"⚠️  Audit {audit_id}: {audit_website.website.url} appears to be a JavaScript-rendered (client-side) site. Skipping audit — Playwright-based rendering support coming soon.")
+            SEOIssues.objects.create(
+                audit=audit_website, issue_type="ERROR",
+                description="This website appears to be client-side rendered (JavaScript-heavy) and could not be meaningfully audited using static HTML fetching. Support for JS-rendered sites is coming soon."
+            )
+            audit_website.status = "FAILED"
+            audit_website.save()
+            return f"Audit {audit_id} skipped — site appears to be client-side rendered"
+
+        robots, sitemap = check_technical_files(audit_website.website.url)
         robots, sitemap = check_technical_files(audit_website.website.url)
         audit_website.has_robots = robots
         audit_website.has_sitemap = sitemap
