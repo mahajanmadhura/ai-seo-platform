@@ -75,13 +75,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-DB_NAME = os.getenv('DB_NAME')
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
+ASGI_APPLICATION = 'config.asgi.application'
+
+import socket
+
+def check_postgres_connection(host, port):
+    try:
+        with socket.create_connection((host, int(port)), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+DB_NAME = os.getenv('DB_NAME', 'seo_db')
+DB_USER = os.getenv('DB_USER', 'seo_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'seo_pass')
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '5432')
 
-if DB_NAME and DB_USER and DB_PASSWORD:
+if check_postgres_connection(DB_HOST, DB_PORT):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -99,7 +110,6 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
 AUTH_USER_MODEL = 'accounts.User'
 
 # ==================================
@@ -152,7 +162,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")  # Your Brevo login email
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")  # SMTP key, not API key
 
-# Channels Configuration
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -161,6 +170,18 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
 
 from datetime import timedelta
 

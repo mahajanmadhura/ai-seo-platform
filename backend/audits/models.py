@@ -18,6 +18,7 @@ class Audit(models.Model):
     key_word=models.CharField(max_length=255,null=True,blank=True)
     has_sitemap=models.BooleanField(default=False)
     has_robots=models.BooleanField(default=False)
+    crawl_state = models.JSONField(null=True, blank=True, default=dict)
     
 
 class CrawledPage(models.Model):
@@ -40,7 +41,7 @@ class CrawledPage(models.Model):
     keyword_in_title=models.BooleanField(default=False)
     keyword_in_h1=models.BooleanField(default=False)
     keyword_in_meta_description=models.BooleanField(default=False)
-    keyword_density=models.IntegerField(default=0)
+    keyword_density=models.FloatField(default=0.0)
     keyword_in_h2_h3=models.BooleanField(default=False)
     is_mobile_friendly=models.BooleanField(default=False)
     is_safe=models.BooleanField(default=False)
@@ -66,6 +67,7 @@ class CrawledPage(models.Model):
     has_content_security_policy=models.BooleanField(default=False)
     has_x_frame_options=models.BooleanField(default=False)
     has_mixed_content=models.BooleanField(default=False)
+    hreflang_data = models.JSONField(null=True, blank=True, default=list)
 
 class SEOIssues(models.Model):
     issue_choices=[
@@ -78,3 +80,15 @@ class SEOIssues(models.Model):
     issue_type=models.CharField(max_length=20,choices=issue_choices)
     description=models.TextField()
     is_fixed=models.BooleanField(default=False)
+
+
+class Link(models.Model):
+    page = models.ForeignKey(CrawledPage, on_delete=models.CASCADE, related_name='links')
+    target_url = models.URLField(blank=True, null=True, max_length=2048)
+    anchor_text = models.CharField(max_length=255, null=True, blank=True)
+    rel = models.CharField(max_length=255, null=True, blank=True)
+    is_internal = models.BooleanField(default=False)
+    is_broken = models.BooleanField(default=False)
+    status_code = models.IntegerField(null=True, blank=True)
+    redirects = models.BooleanField(default=False)
+    redirect_target = models.URLField(null=True, blank=True,max_length=2048)

@@ -65,7 +65,26 @@ class AuditDetailSerializer(serializers.ModelSerializer):
     def get_issues_count(self, obj):
         return SEOIssues.objects.filter(audit=obj).count() + SEOIssues.objects.filter(url__audit=obj).count()
 
+from audits.models import Audit, CrawledPage, SEOIssues, Link
+
+class LinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Link
+        fields = [
+            'id',
+            'target_url',
+            'anchor_text',
+            'rel',
+            'is_internal',
+            'is_broken',
+            'status_code',
+            'redirects',
+            'redirect_target'
+        ]
+
 class CrawledPageSerializer(serializers.ModelSerializer):
+    links = LinkSerializer(many=True, read_only=True)
+
     class Meta:
         model = CrawledPage
         fields = [
@@ -78,7 +97,26 @@ class CrawledPageSerializer(serializers.ModelSerializer):
             'performance_score',
             'core_web_vitals_performance_score',
             'status_code',
-            'word_count'
+            'word_count',
+            'largest_contentful_paint',
+            'cumulative_layout_shift',
+            'first_contentful_paint',
+            'time_to_first_byte',
+            'first_input_delay',
+            'mobile_font_readability',
+            'mobile_tap_targets',
+            'has_mobile_viewport_configuration',
+            'has_valid_SSL',
+            'has_strict_transport_security',
+            'has_content_security_policy',
+            'has_x_frame_options',
+            'has_mixed_content',
+            'hreflang_data',
+            'is_schema_json',
+            'is_hreflang',
+            'is_crawlable',
+            'technical_score',
+            'links'
         ]
 
 class SEOIssueSerializer(serializers.ModelSerializer):
