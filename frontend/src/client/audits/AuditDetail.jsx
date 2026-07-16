@@ -41,6 +41,7 @@ export default function AuditDetail() {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [issueFilter, setIssueFilter] = useState('all');
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [activeTab, setActiveTab] = useState('overview');
 
   const pollIntervalRef = useRef(null);
 
@@ -432,60 +433,337 @@ export default function AuditDetail() {
             </div>
 
             <div className="bg-white rounded-3xl border border-border-color/60 overflow-hidden shadow-sm">
-              <div className="p-5 border-b border-border-color/30 bg-mint-surface/30">
-                <h3 className="text-sm font-black text-deep-green uppercase tracking-wider">Crawled Website Pages ({pages.length})</h3>
-                <p className="text-[10px] text-muted-text font-semibold">Indexed page metrics including responsiveness, performance load speeds, and title tags.</p>
+              <div className="p-5 border-b border-border-color/30 bg-mint-surface/30 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-black text-deep-green uppercase tracking-wider">Crawled Website Pages ({pages.length})</h3>
+                  <p className="text-[10px] text-muted-text font-semibold">Indexed page metrics including responsiveness, performance load speeds, and title tags.</p>
+                </div>
+                <div className="flex flex-wrap gap-1 bg-mint-surface p-1 rounded-xl border border-border-color/40">
+                  {['overview', 'vitals', 'technical', 'security', 'links'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
+                        activeTab === tab
+                          ? 'bg-white text-deep-green shadow-sm'
+                          : 'text-muted-text hover:text-deep-green'
+                      }`}
+                    >
+                      {tab === 'vitals' ? 'Core Web Vitals' : tab === 'technical' ? 'Technical & Mobile' : tab}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
-                      <th className="p-4 pl-6">Crawl URL</th>
-                      <th className="p-4">On-Page SEO</th>
-                      <th className="p-4">Vitals Speed</th>
-                      <th className="p-4">Load Time</th>
-                      <th className="p-4 pr-6 text-right">Title Tag</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-color/30">
-                    {pages.map((page) => (
-                      <tr key={page.id} className="hover:bg-mint-surface/5 transition-colors">
-                        <td className="p-4 pl-6">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-bold text-deep-green truncate max-w-[200px]">{page.url}</span>
-                            <span className="text-[10px] text-muted-text font-semibold">HTTP {page.status_code}</span>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-deep-green">{page.on_page_score || 0}/100</span>
-                            <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
-                              <div className="bg-[#36E682] h-full" style={{ width: `${page.on_page_score || 0}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-deep-green">{page.performance_score || 0}/100</span>
-                            <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
-                              <div className="bg-[#FFB020] h-full" style={{ width: `${page.performance_score || 0}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-xs font-bold text-muted-text">{page.load_time ? `${page.load_time.toFixed(2)}s` : '-'}</span>
-                        </td>
-                        <td className="p-4 pr-6 text-right">
-                          <span className="text-xs font-semibold text-muted-text block truncate max-w-[220px]" title={page.title}>
-                            {page.title || '-'}
-                          </span>
-                        </td>
+              {activeTab === 'overview' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
+                        <th className="p-4 pl-6">Crawl URL</th>
+                        <th className="p-4">On-Page SEO</th>
+                        <th className="p-4">Vitals Speed</th>
+                        <th className="p-4">Load Time</th>
+                        <th className="p-4 pr-6 text-right">Title Tag</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border-color/30">
+                      {pages.map((page) => (
+                        <tr key={page.id} className="hover:bg-mint-surface/5 transition-colors">
+                          <td className="p-4 pl-6">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold text-deep-green truncate max-w-[200px]">{page.url}</span>
+                              <span className="text-[10px] text-muted-text font-semibold">HTTP {page.status_code}</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-deep-green">{page.on_page_score || 0}/100</span>
+                              <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
+                                <div className="bg-[#36E682] h-full" style={{ width: `${page.on_page_score || 0}%` }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-deep-green">{page.performance_score || 0}/100</span>
+                              <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
+                                <div className="bg-[#FFB020] h-full" style={{ width: `${page.performance_score || 0}%` }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-xs font-bold text-muted-text">{page.load_time ? `${page.load_time.toFixed(2)}s` : '-'}</span>
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <span className="text-xs font-semibold text-muted-text block truncate max-w-[220px]" title={page.title}>
+                              {page.title || '-'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'vitals' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
+                        <th className="p-4 pl-6">Crawl URL</th>
+                        <th className="p-4">LCP (Paint)</th>
+                        <th className="p-4">FCP (First Paint)</th>
+                        <th className="p-4">CLS (Shift)</th>
+                        <th className="p-4">TTFB (Response)</th>
+                        <th className="p-4">FID (Delay)</th>
+                        <th className="p-4 pr-6 text-right">CWV Score</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-color/30">
+                      {pages.map((page) => (
+                        <tr key={page.id} className="hover:bg-mint-surface/5 transition-colors">
+                          <td className="p-4 pl-6">
+                            <span className="text-xs font-bold text-deep-green block truncate max-w-[200px]" title={page.url}>{page.url}</span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-muted-text">{page.largest_contentful_paint ? `${page.largest_contentful_paint.toFixed(2)}s` : '0.00s'}</span>
+                              <span className={`text-[9px] font-bold ${page.largest_contentful_paint < 2.5 ? 'text-forest-green' : 'text-red-500'}`}>
+                                {page.largest_contentful_paint < 2.5 ? 'Good (< 2.5s)' : 'Needs Improve'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-muted-text">{page.first_contentful_paint ? `${page.first_contentful_paint.toFixed(2)}s` : '0.00s'}</span>
+                              <span className={`text-[9px] font-bold ${page.first_contentful_paint < 1.8 ? 'text-forest-green' : 'text-red-500'}`}>
+                                {page.first_contentful_paint < 1.8 ? 'Good (< 1.8s)' : 'Needs Improve'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-muted-text">{page.cumulative_layout_shift ? page.cumulative_layout_shift.toFixed(3) : '0.000'}</span>
+                              <span className={`text-[9px] font-bold ${page.cumulative_layout_shift < 0.1 ? 'text-forest-green' : 'text-red-500'}`}>
+                                {page.cumulative_layout_shift < 0.1 ? 'Good (< 0.1)' : 'Needs Improve'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-xs font-bold text-muted-text">{page.time_to_first_byte ? `${page.time_to_first_byte.toFixed(0)}ms` : '0ms'}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-xs font-bold text-muted-text">{page.first_input_delay ? `${page.first_input_delay.toFixed(0)}ms` : '0ms'}</span>
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                              page.core_web_vitals_performance_score >= 90 ? 'bg-green-50 text-green-700 border border-green-200' :
+                              page.core_web_vitals_performance_score >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                              'bg-red-50 text-red-700 border border-red-200'
+                            }`}>
+                              {page.core_web_vitals_performance_score || 0}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'technical' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
+                        <th className="p-4 pl-6">Crawl URL</th>
+                        <th className="p-4">Technical Score</th>
+                        <th className="p-4">Mobile Responsive</th>
+                        <th className="p-4">Mobile Font</th>
+                        <th className="p-4">Tap Targets</th>
+                        <th className="p-4">Schema Data</th>
+                        <th className="p-4">Hreflang Tags</th>
+                        <th className="p-4 pr-6 text-right">Crawlable</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-color/30">
+                      {pages.map((page) => (
+                        <tr key={page.id} className="hover:bg-mint-surface/5 transition-colors">
+                          <td className="p-4 pl-6">
+                            <span className="text-xs font-bold text-deep-green block truncate max-w-[200px]" title={page.url}>{page.url}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-xs font-black text-deep-green">{page.technical_score || 0}/100</span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.has_mobile_viewport_configuration ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.has_mobile_viewport_configuration ? '✅ Responsive' : '❌ Viewport Missing'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.mobile_font_readability ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.mobile_font_readability ? '✅ Legible' : '❌ Too Small'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.mobile_tap_targets ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.mobile_tap_targets ? '✅ Optimized' : '❌ Too Close'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.is_schema_json ? 'text-forest-green' : 'text-muted-text/40'}`}>
+                              {page.is_schema_json ? '✅ Valid Schema' : '❌ Missing'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.is_hreflang ? 'text-forest-green' : 'text-muted-text/40'}`}>
+                              {page.is_hreflang ? '✅ Configured' : 'None'}
+                            </span>
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <span className={`text-xs font-bold ${page.is_crawlable ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.is_crawlable ? '✅ Yes' : '❌ Noindex'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'security' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
+                        <th className="p-4 pl-6">Crawl URL</th>
+                        <th className="p-4">SSL Certificate</th>
+                        <th className="p-4">HSTS Headers</th>
+                        <th className="p-4">CSP Config</th>
+                        <th className="p-4">X-Frame-Options</th>
+                        <th className="p-4 pr-6 text-right">Mixed Content</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-color/30">
+                      {pages.map((page) => (
+                        <tr key={page.id} className="hover:bg-mint-surface/5 transition-colors">
+                          <td className="p-4 pl-6">
+                            <span className="text-xs font-bold text-deep-green block truncate max-w-[200px]" title={page.url}>{page.url}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.has_valid_SSL ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.has_valid_SSL ? '✅ Valid Certificate' : '❌ Invalid Certificate'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.has_strict_transport_security ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.has_strict_transport_security ? '✅ Enabled' : '❌ Missing'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.has_content_security_policy ? 'text-forest-green' : 'text-amber-500'}`}>
+                              {page.has_content_security_policy ? '✅ Enabled' : '⚠️ Missing'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-xs font-bold ${page.has_x_frame_options ? 'text-forest-green' : 'text-red-500'}`}>
+                              {page.has_x_frame_options ? '✅ Configured' : '❌ Clickjacking Risk'}
+                            </span>
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <span className={`text-xs font-bold ${!page.has_mixed_content ? 'text-forest-green' : 'text-red-500'}`}>
+                              {!page.has_mixed_content ? '✅ Clean' : '❌ Warnings'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'links' && (() => {
+                const allOutgoingLinks = pages.flatMap(page =>
+                  (page.links || []).map(link => ({
+                    ...link,
+                    sourceUrl: page.url
+                  }))
+                );
+
+                if (allOutgoingLinks.length === 0) {
+                  return (
+                    <div className="p-10 text-center text-xs text-muted-text font-semibold">
+                      No outgoing links discovered on these pages.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border-color/40 text-[10px] font-black uppercase text-muted-text bg-mint-surface/10">
+                          <th className="p-4 pl-6">Source Page</th>
+                          <th className="p-4">Target Link</th>
+                          <th className="p-4">Anchor Text</th>
+                          <th className="p-4">Rel Attribute</th>
+                          <th className="p-4">Link Type</th>
+                          <th className="p-4">Status Code</th>
+                          <th className="p-4 pr-6 text-right">Condition</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-color/30">
+                        {allOutgoingLinks.map((link, index) => (
+                          <tr key={`${link.id}-${index}`} className="hover:bg-mint-surface/5 transition-colors">
+                            <td className="p-4 pl-6">
+                              <span className="text-xs font-bold text-deep-green block truncate max-w-[150px]" title={link.sourceUrl}>
+                                {link.sourceUrl}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs text-muted-text block truncate max-w-[200px]" title={link.target_url}>
+                                {link.target_url || '-'}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs font-semibold text-muted-text block truncate max-w-[120px]" title={link.anchor_text}>
+                                {link.anchor_text || '(no anchor text)'}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs text-muted-text">{link.rel || '-'}</span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-[10px] font-bold uppercase">{link.is_internal ? 'Internal' : 'External'}</span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs font-bold">{link.status_code || '-'}</span>
+                            </td>
+                            <td className="p-4 pr-6 text-right">
+                              {link.is_broken ? (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">
+                                  Broken
+                                </span>
+                              ) : link.redirects ? (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200" title={link.redirect_target}>
+                                  Redirects
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
+                                  OK
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           </>
         )}

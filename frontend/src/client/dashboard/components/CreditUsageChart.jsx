@@ -62,7 +62,8 @@ export default function CreditUsageChart() {
 
   const getBarColor = (day) => {
     if (day.amount > 0) {
-      const ratio = day.amount / maxAmt;
+      const maxCapacity = Math.max(maxAmt, 25);
+      const ratio = day.amount / maxCapacity;
       if (ratio <= 0.35) return 'bg-[#36E682] border-[#36E682]';
       if (ratio <= 0.7) return 'bg-[#0B5A4A] border-[#0B5A4A]';
       return 'bg-[#053D34] border-[#053D34]';
@@ -72,7 +73,8 @@ export default function CreditUsageChart() {
 
   const getBarHeight = (day) => {
     if (day.amount > 0) {
-      return (day.amount / maxAmt) * 75 + 15;
+      const maxCapacity = Math.max(maxAmt, 25);
+      return (day.amount / maxCapacity) * 75 + 15;
     }
     return day.defaultHeight;
   };
