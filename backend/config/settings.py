@@ -1,4 +1,7 @@
 from pathlib import Path
+from datetime import timedelta
+from decouple import config
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +25,7 @@ INSTALLED_APPS = [
     'websites',
     'audits',
     'payments',
-
+    'reports',
 ]
 
 MIDDLEWARE = [
@@ -90,16 +93,8 @@ REST_FRAMEWORK = {
     ),
 }
 
-# ==========================================
-# CELERY & REDIS SETTINGS
-# ==========================================
-# The URL where Redis is running (default local port is 6379)
 CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-
-# Where Celery should store the results of the tasks once they are done
 CELERY_RESULT_BACKEND = 'django-db'
-
-# Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -109,7 +104,6 @@ FRONTEND_URL = "http://localhost:3000"
 DOMAIN_NAME = "localhost:8000"
 BREVO_API_KEY = "any-random-string-for-now"
 
-# Channels Configuration
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -119,14 +113,17 @@ CHANNEL_LAYERS = {
     },
 }
 
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-from decouple import config
-
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST_USER = 'aiseoauditplatform@gmail.com'
+DEFAULT_FROM_EMAIL = 'aiseoauditplatform@gmail.com'
