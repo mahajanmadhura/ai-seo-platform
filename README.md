@@ -74,7 +74,7 @@ python manage.py runserver
 **Terminal 2: Start the Celery Worker**
 *(Note: The `--pool=solo` flag is required for Windows environments to prevent forking errors).*
 ```bash
-celery -A config worker --loglevel=info --pool=solo
+celery -A config worker --pool=threads --concurrency=10 -l info 
 ```
 
 ## 🧪 Testing the API
