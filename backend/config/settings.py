@@ -2,8 +2,10 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
 
@@ -57,6 +59,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
 DATABASES = {
     'default': {
@@ -100,7 +103,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-FRONTEND_URL = "http://localhost:3000"
+FRONTEND_URL = 'http://localhost:3000'
 DOMAIN_NAME = "localhost:8000"
 BREVO_API_KEY = "any-random-string-for-now"
 
