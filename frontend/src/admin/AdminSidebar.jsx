@@ -3,10 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  BarChart3,
   History,
-  Activity,
-  Settings,
   LogOut,
   X
 } from 'lucide-react';
@@ -18,10 +15,7 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'User Management', path: '/admin/users', icon: Users },
-    { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
-    { name: 'Credit Activity', path: '/admin/audit-logs', icon: History },
-    { name: 'System Monitoring', path: '/admin/monitoring', icon: Activity },
-    { name: 'Settings', path: '/admin/settings', icon: Settings }
+    { name: 'Credit Activity', path: '/admin/audit-logs', icon: History }
   ];
 
   const isActive = (path) => {

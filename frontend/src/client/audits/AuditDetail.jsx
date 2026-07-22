@@ -210,8 +210,8 @@ export default function AuditDetail() {
     );
   }
 
-  const averageOnPage = pages.length > 0 ? Math.round(pages.reduce((acc, p) => acc + (p.on_page_score || 0), 0) / pages.length) : 0;
-  const averagePerformance = pages.length > 0 ? Math.round(pages.reduce((acc, p) => acc + (p.performance_score || 0), 0) / pages.length) : 0;
+  const averageOnPage = audit.average_on_page_score;
+  const averagePerformance = audit.average_performance_score;
 
   const filteredIssues = issues.filter(issue => {
     if (issueFilter === 'error') return issue.severity === 'ERROR';
@@ -290,7 +290,9 @@ export default function AuditDetail() {
               <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
                 <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Overall Score</span>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-black text-deep-green">{audit.overall_score || 0}</span>
+                  <span className="text-3xl font-black text-deep-green">
+                    {audit.overall_score !== null && audit.overall_score !== undefined ? audit.overall_score : 'Not Available'}
+                  </span>
                   <span className="text-xs text-muted-text font-bold">/100</span>
                 </div>
                 <div className="w-full bg-mint-surface h-1 rounded-full overflow-hidden mt-3">
@@ -301,29 +303,35 @@ export default function AuditDetail() {
               <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
                 <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Avg On-Page Score</span>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-black text-deep-green">{averageOnPage}</span>
+                  <span className="text-3xl font-black text-deep-green">
+                    {averageOnPage !== null && averageOnPage !== undefined ? averageOnPage : 'Not Available'}
+                  </span>
                   <span className="text-xs text-muted-text font-bold">/100</span>
                 </div>
                 <div className="w-full bg-mint-surface h-1 rounded-full overflow-hidden mt-3">
-                  <div className="bg-[#36E682] h-full rounded-full" style={{ width: `${averageOnPage}%` }} />
+                  <div className="bg-[#36E682] h-full rounded-full" style={{ width: `${averageOnPage || 0}%` }} />
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
                 <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Avg Speed Score</span>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-black text-deep-green">{averagePerformance}</span>
+                  <span className="text-3xl font-black text-deep-green">
+                    {averagePerformance !== null && averagePerformance !== undefined ? averagePerformance : 'Not Available'}
+                  </span>
                   <span className="text-xs text-muted-text font-bold">/100</span>
                 </div>
                 <div className="w-full bg-mint-surface h-1 rounded-full overflow-hidden mt-3">
-                  <div className="bg-[#FFB020] h-full rounded-full" style={{ width: `${averagePerformance}%` }} />
+                  <div className="bg-[#FFB020] h-full rounded-full" style={{ width: `${averagePerformance || 0}%` }} />
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
                 <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Crawled Pages</span>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-black text-deep-green">{pages.length}</span>
+                  <span className="text-3xl font-black text-deep-green">
+                    {audit.crawled_pages_count !== null && audit.crawled_pages_count !== undefined ? audit.crawled_pages_count : 'Not Available'}
+                  </span>
                   <span className="text-xs text-muted-text font-bold">URLs</span>
                 </div>
                 <div className="text-[10px] text-muted-text font-semibold mt-3">Crawling BFS queue limit of 5</div>
@@ -332,11 +340,13 @@ export default function AuditDetail() {
               <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
                 <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Issues Identified</span>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-black text-red-600">{issues.length}</span>
+                  <span className="text-3xl font-black text-red-600">
+                    {audit.issues_count !== null && audit.issues_count !== undefined ? audit.issues_count : 'Not Available'}
+                  </span>
                   <span className="text-xs text-muted-text font-bold">alerts</span>
                 </div>
                 <div className="text-[10px] text-muted-text font-semibold mt-3">
-                  {issues.filter(i => i.severity === 'ERROR').length} Errors • {issues.filter(i => i.severity === 'WARNING').length} Warnings
+                  {audit.errors_count !== null && audit.errors_count !== undefined ? `${audit.errors_count} Errors` : '0 Errors'} • {audit.warnings_count !== null && audit.warnings_count !== undefined ? `${audit.warnings_count} Warnings` : '0 Warnings'}
                 </div>
               </div>
             </div>
@@ -478,7 +488,9 @@ export default function AuditDetail() {
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-deep-green">{page.on_page_score || 0}/100</span>
+                              <span className="text-xs font-black text-deep-green">
+                                {page.on_page_score !== null && page.on_page_score !== undefined ? `${page.on_page_score}/100` : 'N/A'}
+                              </span>
                               <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
                                 <div className="bg-[#36E682] h-full" style={{ width: `${page.on_page_score || 0}%` }} />
                               </div>
@@ -486,7 +498,9 @@ export default function AuditDetail() {
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-deep-green">{page.performance_score || 0}/100</span>
+                              <span className="text-xs font-black text-deep-green">
+                                {page.performance_score !== null && page.performance_score !== undefined ? `${page.performance_score}/100` : 'N/A'}
+                              </span>
                               <div className="w-16 bg-mint-surface h-1 rounded-full overflow-hidden">
                                 <div className="bg-[#FFB020] h-full" style={{ width: `${page.performance_score || 0}%` }} />
                               </div>
@@ -559,11 +573,12 @@ export default function AuditDetail() {
                           </td>
                           <td className="p-4 pr-6 text-right">
                             <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                              page.core_web_vitals_performance_score === null || page.core_web_vitals_performance_score === undefined ? 'bg-gray-50 text-gray-600 border border-gray-200' :
                               page.core_web_vitals_performance_score >= 90 ? 'bg-green-50 text-green-700 border border-green-200' :
                               page.core_web_vitals_performance_score >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-red-50 text-red-700 border border-red-200'
                             }`}>
-                              {page.core_web_vitals_performance_score || 0}%
+                              {page.core_web_vitals_performance_score !== null && page.core_web_vitals_performance_score !== undefined ? `${page.core_web_vitals_performance_score}%` : 'N/A'}
                             </span>
                           </td>
                         </tr>
@@ -595,7 +610,9 @@ export default function AuditDetail() {
                             <span className="text-xs font-bold text-deep-green block truncate max-w-[200px]" title={page.url}>{page.url}</span>
                           </td>
                           <td className="p-4">
-                            <span className="text-xs font-black text-deep-green">{page.technical_score || 0}/100</span>
+                            <span className="text-xs font-black text-deep-green">
+                              {page.technical_score !== null && page.technical_score !== undefined ? `${page.technical_score}/100` : 'N/A'}
+                            </span>
                           </td>
                           <td className="p-4">
                             <span className={`text-xs font-bold ${page.has_mobile_viewport_configuration ? 'text-forest-green' : 'text-red-500'}`}>

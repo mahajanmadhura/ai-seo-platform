@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 
 export default function StatsCards({ totalCount, credits, auditsCount, averageScore, loading }) {
   const getScoreStatus = (score) => {
+    if (score === null || score === undefined) {
+      return { label: 'Pending Audit', color: 'text-neutral-500 bg-neutral-50 border-neutral-200' };
+    }
     if (score >= 80) return { label: 'Good Health', color: 'text-[#0B5A4A] bg-[#36E682]/10 border-[#36E682]/20' };
     if (score >= 50) return { label: 'Needs Work', color: 'text-amber-700 bg-amber-500/10 border-amber-500/20' };
     return { label: 'Critical State', color: 'text-brand-burnt-coral bg-brand-burnt-coral/10 border-brand-burnt-coral/20' };
@@ -42,7 +45,7 @@ export default function StatsCards({ totalCount, credits, auditsCount, averageSc
     },
     {
       title: 'Average SEO Score',
-      value: `${averageScore}%`,
+      value: averageScore !== null && averageScore !== undefined ? `${averageScore}%` : 'N/A',
       desc: 'Quality indicator score',
       isPrimary: false,
       textColor: 'text-[#053D34]',

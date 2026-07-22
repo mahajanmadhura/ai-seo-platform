@@ -53,3 +53,12 @@ export const getAuditIssues = async (id) => {
     return { success: false, message: err.response?.data?.error || 'Failed to load issues.' };
   }
 };
+
+export const getDashboardStats = async () => {
+  try {
+    const res = await api.get('/api/v1/audits/dashboard-stats/');
+    return { success: true, data: res.data };
+  } catch (err) {
+    return { success: false, message: err.response?.data?.error || 'Failed to load dashboard stats.' };
+  }
+};

@@ -1,13 +1,41 @@
-import React from 'react';
-import { ArrowUpRight, Compass, ShieldCheck, Zap, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ArrowUpRight, Compass, ShieldCheck, Zap, AlertTriangle, Clock } from 'lucide-react';
 import AuditStageTimeline from './AuditStageTimeline';
 import CrawlAnimation from './CrawlAnimation';
 
 export default function AuditRunningState({ audit, secondsElapsed, processStatus }) {
-  const currentStep = processStatus?.current_step || 'QUEUED';
   const statusMessage = processStatus?.message || 'Queuing audit process...';
-  const progressPercent = processStatus?.progress_percent ?? 5;
+  const baseProgress = processStatus?.progress_percent ?? 5;
   const status = processStatus?.status || 'PENDING';
+
+  // Format seconds to H M S format helper
+  const formatDuration = (totalSeconds) => {
+    if (totalSeconds === null || totalSeconds === undefined) return '0s';
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    const parts = [];
+    if (hrs > 0) parts.push(`${hrs}h`);
+    if (mins > 0 || hrs > 0) parts.push(`${mins}m`);
+    parts.push(`${secs}s`);
+
+    return parts.join(' ');
+  };
+
+  // Dynamically map backend database progress percentage directly to the 8 timeline steps
+  const currentStep = useMemo(() => {
+    if (status === 'DONE') return 'DONE';
+    if (status === 'FAILED') return 'SAVING_ISSUES';
+
+    if (baseProgress <= 5) return 'QUEUED';
+    if (baseProgress <= 15) return 'FETCHING_WEBSITE';
+    if (baseProgress <= 25) return 'CHECKING_ROBOTS';
+    if (baseProgress <= 55) return 'CRAWLING_PAGES';
+    if (baseProgress <= 69) return 'CHECKING_LINKS';
+    if (baseProgress <= 85) return 'PAGESPEED';
+    return 'SAVING_ISSUES';
+  }, [baseProgress, status]);
 
   const getActivityDetails = () => {
     switch (currentStep) {
@@ -32,7 +60,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
       case 'CRAWLING_PAGES':
         return {
           title: 'Crawling site structure',
-          desc: 'Traversing website pages (limit 5) to collect DOM structure tags.',
+          desc: 'Traversing website pages to collect DOM structure tags.',
           icon: <Zap className="w-5 h-5 text-deep-green" />,
         };
       case 'CHECKING_LINKS':
@@ -67,7 +95,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
   return (
     <div className="space-y-8">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-border-color/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-2">
+        <div className="space-y-2 text-left">
           <div className="flex items-center gap-3">
             <span className="text-[10px] uppercase font-black text-forest-green bg-[#E5F3EC] px-3 py-1 rounded-full border border-forest-green/10">
               {status}
@@ -80,19 +108,19 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
           <div className="text-[11px] text-muted-text font-bold flex items-center gap-2">
             <span>5 credits used for this audit</span>
             <span>•</span>
-            <span>Running duration: {secondsElapsed}s</span>
+            <span>Running duration: {formatDuration(secondsElapsed)}</span>
           </div>
         </div>
 
-        <div className="w-full md:w-64 space-y-1">
+        <div className="w-full md:w-64 space-y-1 text-left">
           <div className="flex justify-between text-[10px] font-black text-deep-green">
             <span>PROGRESS</span>
-            <span>{progressPercent}%</span>
+            <span>{Math.round(baseProgress)}%</span>
           </div>
           <div className="w-full bg-[#F5F7F6] rounded-full h-2 overflow-hidden border border-border-color/20">
             <div
-              className="bg-[#36E682] h-2 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progressPercent}%` }}
+              className="bg-[#36E682] h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${baseProgress}%` }}
             />
           </div>
         </div>
@@ -102,7 +130,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
         <div className="lg:col-span-2 space-y-8">
           <CrawlAnimation />
 
-          <div className="bg-[#E5F3EC]/40 border border-[#36E682]/10 rounded-3xl p-6 flex gap-4 items-start">
+          <div className="bg-[#E5F3EC]/40 border border-[#36E682]/10 rounded-3xl p-6 flex gap-4 items-start text-left">
             <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-[#36E682]/20 shadow-sm flex-shrink-0">
               {activity.icon}
             </div>
@@ -121,7 +149,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
       </div>
 
       {secondsElapsed > 180 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-5 rounded-3xl text-xs font-semibold leading-relaxed flex items-start gap-3 shadow-sm">
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-5 rounded-3xl text-xs font-semibold leading-relaxed flex items-start gap-3 shadow-sm text-left animate-fade-in">
           <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-600 mt-0.5 animate-pulse" />
           <div className="space-y-0.5">
             <span className="font-black block text-amber-900">Notice: Slow Audit Progress</span>
@@ -130,33 +158,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
         </div>
       )}
 
-      <div className="space-y-4 pt-4">
-        <div className="border-t border-border-color/30 pt-6">
-          <h3 className="text-xs font-black text-deep-green uppercase tracking-wider mb-6">Upcoming Audit Insights</h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 opacity-40 select-none">
-          <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm h-28 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-muted-text">OVERALL SCORE</span>
-            <div className="h-6 w-12 bg-muted-text/10 rounded animate-pulse" />
-          </div>
-          <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm h-28 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-muted-text">ON-PAGE SCORE</span>
-            <div className="h-6 w-12 bg-muted-text/10 rounded animate-pulse" />
-          </div>
-          <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm h-28 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-muted-text">PERFORMANCE</span>
-            <div className="h-6 w-12 bg-muted-text/10 rounded animate-pulse" />
-          </div>
-          <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm h-28 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-muted-text">PAGES</span>
-            <div className="h-6 w-12 bg-muted-text/10 rounded animate-pulse" />
-          </div>
-          <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm h-28 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-muted-text">ISSUES</span>
-            <div className="h-6 w-12 bg-muted-text/10 rounded animate-pulse" />
-          </div>
-        </div>
-      </div>
+     
     </div>
   );
 }

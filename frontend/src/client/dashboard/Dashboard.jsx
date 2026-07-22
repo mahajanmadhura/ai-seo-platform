@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { getAllWebsites } from '../../services/websites';
-import { getAudits, startAudit } from '../../services/audits';
+import { getAudits, startAudit, getDashboardStats } from '../../services/audits';
 import { getCreditBalance } from '../../services/payments';
 
 import StatsCards from './components/StatsCards';
@@ -22,16 +22,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [audits, setAudits] = useState([]);
-  const [credits, setCredits] = useState(0);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(false);
     try {
-      const [webRes, auditRes, creditRes] = await Promise.all([
+      const [webRes, auditRes, statsRes] = await Promise.all([
         getAllWebsites(),
         getAudits(),
-        getCreditBalance()
+        getDashboardStats()
       ]);
 
       if (webRes?.success && webRes?.data) {
@@ -44,8 +44,8 @@ export default function Dashboard() {
         setAudits(auditRes.data);
       }
 
-      if (creditRes?.success && creditRes?.data) {
-        setCredits(creditRes.data.balance);
+      if (statsRes?.success && statsRes?.data) {
+        setDashboardStats(statsRes.data);
       }
     } catch (err) {
       setError(true);
@@ -71,11 +71,10 @@ export default function Dashboard() {
     }
   };
 
-  const totalCount = websites.length;
-  const doneAudits = audits.filter((a) => a.status === 'DONE' && a.overall_score !== null);
-  const averageScore = doneAudits.length > 0
-    ? Math.round(doneAudits.reduce((acc, curr) => acc + (curr.overall_score || 0), 0) / doneAudits.length)
-    : 0;
+  const totalCount = dashboardStats?.total_websites_monitored;
+  const credits = dashboardStats?.credits_remaining;
+  const auditsCount = dashboardStats?.total_audits_performed;
+  const averageScore = dashboardStats?.average_seo_score;
 
   const step1 = websites.length > 0;
   const step2 = websites.some((w) => w.is_verified);
@@ -156,7 +155,7 @@ export default function Dashboard() {
         <StatsCards
           totalCount={totalCount}
           credits={credits}
-          auditsCount={audits.length}
+          auditsCount={auditsCount}
           averageScore={averageScore}
           loading={loading}
         />
@@ -174,7 +173,7 @@ export default function Dashboard() {
         {/* Row 3: Website Health (4 cols) + Critical Issues (4 cols) + Quick Audit (4 cols) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
           <div className="lg:col-span-4 flex flex-col h-full">
-            <WebsiteHealthGauge websites={websites} audits={audits} loading={loading} />
+            <WebsiteHealthGauge averageScore={averageScore} loading={loading} />
           </div>
           <div className="lg:col-span-4 flex flex-col h-full">
             <TopIssuesRecommendations audits={audits} />

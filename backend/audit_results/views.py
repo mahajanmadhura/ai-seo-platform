@@ -44,3 +44,36 @@ class AuditResultsViewSet(viewsets.ReadOnlyModelViewSet):
         issues = SEOIssues.objects.filter(Q(audit=audit) | Q(url__audit=audit))
         serializer = SEOIssueSerializer(issues, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='dashboard-stats')
+    def dashboard_stats(self, request):
+        user_audits = Audit.objects.filter(website__owner=request.user)
+        completed_audits = user_audits.filter(status='DONE')
+
+        overall_scores = []
+        for audit in completed_audits:
+            if audit.overall_Score is not None:
+                overall_scores.append(audit.overall_Score)
+            else:
+                pages = audit.crawledpage_set.all()
+                if pages.exists():
+                    scores = [p.on_page_score for p in pages if p.on_page_score is not None]
+                    if scores:
+                        overall_scores.append(int(sum(scores) / len(scores)))
+
+        avg_score = int(sum(overall_scores) / len(overall_scores)) if overall_scores else None
+
+        from websites.models import Website
+        total_websites = Website.objects.filter(owner=request.user).count()
+        total_audits = user_audits.count()
+
+        from payments.models import UserCredit
+        credit_account = UserCredit.objects.filter(user=request.user).first()
+        credits_remaining = credit_account.balance if credit_account else 0
+
+        return Response({
+            'average_seo_score': avg_score,
+            'total_websites_monitored': total_websites,
+            'total_audits_performed': total_audits,
+            'credits_remaining': credits_remaining
+        })

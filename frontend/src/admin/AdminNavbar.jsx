@@ -13,14 +13,8 @@ export default function AdminNavbar({ setMobileOpen }) {
         return 'Dashboard';
       case '/admin/users':
         return 'User Management';
-      case '/admin/analytics':
-        return 'Analytics';
       case '/admin/audit-logs':
         return 'Credit Activity';
-      case '/admin/monitoring':
-        return 'System Monitoring';
-      case '/admin/settings':
-        return 'Settings';
       default:
         return 'Administration';
     }

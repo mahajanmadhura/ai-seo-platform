@@ -1,17 +1,14 @@
 import React from 'react';
 import { Shield } from 'lucide-react';
 
-export default function WebsiteHealthGauge({ websites, audits, loading }) {
-  const doneAudits = audits.filter((a) => a.status === 'DONE' && a.overall_score !== null);
-  const averageScore = doneAudits.length > 0
-    ? Math.round(doneAudits.reduce((acc, curr) => acc + (curr.overall_score || 0), 0) / doneAudits.length)
-    : 0;
-
+export default function WebsiteHealthGauge({ averageScore, loading }) {
+  const fillValue = averageScore !== null && averageScore !== undefined ? averageScore : 0;
   const radius = 50;
   const circumference = Math.PI * radius;
-  const filledOffset = circumference - (averageScore / 100) * circumference;
+  const filledOffset = circumference - (fillValue / 100) * circumference;
 
   const getGaugeColor = (score) => {
+    if (score === null || score === undefined) return '#6D8179';
     if (score >= 80) return '#053D34';
     if (score >= 50) return '#36E682';
     return '#E0705F';
@@ -74,9 +71,9 @@ export default function WebsiteHealthGauge({ websites, audits, loading }) {
                   x="70"
                   y="65"
                   textAnchor="middle"
-                  className="fill-[#053D34] font-black text-[22px] select-none"
+                  className="fill-[#053D34] font-black text-[16px] select-none"
                 >
-                  {averageScore}%
+                  {averageScore !== null && averageScore !== undefined ? `${averageScore}%` : 'N/A'}
                 </text>
                 <text
                   x="70"

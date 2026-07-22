@@ -1,4 +1,5 @@
 from celery import shared_task, chord
+from celery.exceptions import Retry
 from .models import Audit,CrawledPage,SEOIssues, Link
 from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension, is_soft_404
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile, calculate_technical_score, calculate_overall_score, analyze_content_uniqueness, analyze_hreflang_reciprocity
@@ -46,11 +47,20 @@ def finalize_audit(cwv_results, audit_id):
     audit_website.crawl_state = {}
     audit_website.save()
 
+    from process_status.services import update_process_status
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="DONE",
+        current_step="DONE",
+        message="Audit complete",
+        progress_percent=100
+    )
+
     return f"Audit Complete! Crawled through {visited_count} pages"
 
     
-@shared_task(bind=True, acks_late=True, max_retries=3)
-def run_seo_audit(self, audit_id):
+def _execute_seo_audit(self, audit_id):
     audit_website = Audit.objects.get(id=audit_id)
 
     resuming = bool(audit_website.crawl_state)
@@ -141,8 +151,8 @@ def run_seo_audit(self, audit_id):
                     urls_to_visit.append((sitemap_url, 0))
                     queued_urls.add(sitemap_url)
 
-    CONCURRENT_REQUESTS = 10  # matches your spec's crawler config
-    MAX_DEPTH = 5  # matches your spec
+    CONCURRENT_REQUESTS = 15
+    MAX_DEPTH = 5  
     try:
         MAX_PAGES = 10
         while urls_to_visit and len(visited_urls) < MAX_PAGES:
@@ -178,6 +188,18 @@ def run_seo_audit(self, audit_id):
 
             send_progress(audit_id, {"pages_crawled": len(visited_urls)})
 
+            from process_status.services import update_process_status
+            current_pages = len(visited_urls)
+            crawl_progress = 15 + int((current_pages / MAX_PAGES) * 54)  # Scales from 15% to 69%
+            update_process_status(
+                process_type="audit",
+                object_id=audit_id,
+                status="RUNNING",
+                current_step="CRAWLING",
+                message=f"Crawling pages ({current_pages}/{MAX_PAGES})",
+                progress_percent=crawl_progress
+            )
+
     except Exception as e:
         print(f"Audit {audit_id} crashed: {e}")
         traceback.print_exc()
@@ -193,7 +215,7 @@ def run_seo_audit(self, audit_id):
             audit_website.status = "FAILED"
             audit_website.crawl_state = {}
             audit_website.save()
-            return f"Audit {audit_id} failed permanently after {self.max_retries} retries: {e}"
+            raise e
 
     if len(visited_urls) > 0:
         audit_website.total_pages = len(visited_urls)
@@ -221,26 +243,36 @@ def run_seo_audit(self, audit_id):
         return f"Audit {audit_id} failed — no pages could be crawled"
 
 
-@shared_task
-def run_seo_audit(audit_id):
+@shared_task(bind=True, acks_late=True, max_retries=3)
+def run_seo_audit(self, audit_id):
+    from process_status.services import update_process_status
+    update_process_status(
+        process_type="audit",
+        object_id=audit_id,
+        status="RUNNING",
+        current_step="CRAWLING",
+        message="Crawling and analyzing pages",
+        progress_percent=15
+    )
     try:
-        res = _execute_seo_audit(audit_id)
-        from process_status.services import update_process_status
+        res = _execute_seo_audit(self, audit_id)
         update_process_status(
             process_type="audit",
             object_id=audit_id,
-            status="DONE",
-            current_step="DONE",
-            message="Done",
-            progress_percent=100
+            status="RUNNING",
+            current_step="ANALYZING",
+            message="Analyzing page performance & Core Web Vitals",
+            progress_percent=70
         )
         return res
+    except Retry as retry_exc:
+        raise retry_exc
     except Exception as e:
         try:
             audit_website = Audit.objects.get(id=audit_id)
             audit_website.status = "FAILED"
+            audit_website.crawl_state = {}
             audit_website.save()
-            from process_status.services import update_process_status
             update_process_status(
                 process_type="audit",
                 object_id=audit_id,

@@ -85,8 +85,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
+             <Route
               path="/admin"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
               element={
                 <AdminProtectedRoute>
                   <AdminDashboard />
@@ -102,31 +110,7 @@ function App() {
               }
             />
             <Route
-              path="/admin/analytics"
-              element={
-                <AdminProtectedRoute>
-                  <AdminDashboard />
-                </AdminProtectedRoute>
-              }
-            />
-            <Route
               path="/admin/audit-logs"
-              element={
-                <AdminProtectedRoute>
-                  <AdminDashboard />
-                </AdminProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/monitoring"
-              element={
-                <AdminProtectedRoute>
-                  <AdminDashboard />
-                </AdminProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings"
               element={
                 <AdminProtectedRoute>
                   <AdminDashboard />

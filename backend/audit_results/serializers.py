@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from audits.models import Audit, CrawledPage, SEOIssues
 
@@ -34,6 +35,10 @@ class AuditDetailSerializer(serializers.ModelSerializer):
     ai_summary = serializers.CharField(source='ai_recommendation', read_only=True)
     crawled_pages_count = serializers.SerializerMethodField()
     issues_count = serializers.SerializerMethodField()
+    errors_count = serializers.SerializerMethodField()
+    warnings_count = serializers.SerializerMethodField()
+    average_on_page_score = serializers.SerializerMethodField()
+    average_performance_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Audit
@@ -45,6 +50,10 @@ class AuditDetailSerializer(serializers.ModelSerializer):
             'ai_summary',
             'crawled_pages_count',
             'issues_count',
+            'errors_count',
+            'warnings_count',
+            'average_on_page_score',
+            'average_performance_score',
             'started_at',
             'completed_at'
         ]
@@ -57,13 +66,35 @@ class AuditDetailSerializer(serializers.ModelSerializer):
             scores = [p.on_page_score for p in pages if p.on_page_score is not None]
             if scores:
                 return int(sum(scores) / len(scores))
-        return 0
+        return None
 
     def get_crawled_pages_count(self, obj):
         return obj.crawledpage_set.count()
 
     def get_issues_count(self, obj):
-        return SEOIssues.objects.filter(audit=obj).count() + SEOIssues.objects.filter(url__audit=obj).count()
+        return SEOIssues.objects.filter(Q(audit=obj) | Q(url__audit=obj)).count()
+
+    def get_errors_count(self, obj):
+        return SEOIssues.objects.filter(Q(audit=obj) | Q(url__audit=obj), issue_type='ERROR').count()
+
+    def get_warnings_count(self, obj):
+        return SEOIssues.objects.filter(Q(audit=obj) | Q(url__audit=obj), issue_type='WARNING').count()
+
+    def get_average_on_page_score(self, obj):
+        pages = obj.crawledpage_set.all()
+        if pages.exists():
+            scores = [p.on_page_score for p in pages if p.on_page_score is not None]
+            if scores:
+                return int(sum(scores) / len(scores))
+        return None
+
+    def get_average_performance_score(self, obj):
+        pages = obj.crawledpage_set.all()
+        if pages.exists():
+            scores = [p.performance_score for p in pages if p.performance_score is not None]
+            if scores:
+                return int(sum(scores) / len(scores))
+        return None
 
 from audits.models import Audit, CrawledPage, SEOIssues, Link
 
