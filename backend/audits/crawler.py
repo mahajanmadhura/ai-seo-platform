@@ -481,7 +481,7 @@ def fetch_core_web_vitals(url):
         api_url+=f"&key={api_key}"
 
     try:
-        response = requests.get(api_url, timeout=30)
+        response = requests.get(api_url, timeout=60)
         data = response.json()
         
         # 1. Safely drill down to the "audits" folder. If anything is missing, return an empty dict {}
