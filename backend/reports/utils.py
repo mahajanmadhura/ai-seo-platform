@@ -1,8 +1,7 @@
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle, KeepTogether, PageBreak
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.units import inch
 import os
 from django.conf import settings
 from django.db.models import Avg
@@ -15,24 +14,49 @@ def generate_pdf_report(audit, branding=None):
     pdf_path = os.path.join(settings.MEDIA_ROOT, 'reports', 'pdfs', pdf_filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
 
-    doc = SimpleDocTemplate(pdf_path, pagesize=A4,
-        rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    # Margins: 36pt (0.5 inch) for modern expanded look
+    doc = SimpleDocTemplate(
+        pdf_path, 
+        pagesize=A4,
+        rightMargin=28, 
+        leftMargin=28, 
+        topMargin=28, 
+        bottomMargin=24
+    )
 
-    primary_color = colors.HexColor(branding.primary_color if branding else '#1a1a2e')
+    # Color Palette Definitions
+    primary_color = colors.HexColor(branding.primary_color if branding else '#1E293B')  # Slate Blue / Dark Navy
+    accent_color = colors.HexColor('#2563EB')   # Vibrant Royal Blue
+    bg_light = colors.HexColor('#F8FAFC')       # Slate Light Grey
+    card_border = colors.HexColor('#E2E8F0')    # Subtle Border
+    text_dark = colors.HexColor('#0F172A')      # Dark Charcoal Text
+    text_muted = colors.HexColor('#64748B')     # Muted Text
+    
     company_name = branding.company_name if branding and branding.is_white_label else 'AI SEO Audit Platform'
 
-    def s(name, size, bold=False, color='#333333', align=0, indent=0, before=0, after=4):
-        return ParagraphStyle(name, fontSize=size,
+    # Typography / Paragraph Styles Helper
+    def create_style(name, size, bold=False, color='#0F172A', align=0, indent=0, before=0, after=4, leading=None):
+        return ParagraphStyle(
+            name,
+            fontSize=size,
+            leading=leading if leading else size + 4,
             fontName='Helvetica-Bold' if bold else 'Helvetica',
-            textColor=colors.HexColor(color), alignment=align,
-            leftIndent=indent, spaceBefore=before, spaceAfter=after)
+            textColor=colors.HexColor(color) if isinstance(color, str) else color,
+            alignment=align,
+            leftIndent=indent,
+            spaceBefore=before,
+            spaceAfter=after
+        )
 
-    title_s   = s('ti', 20, bold=True, color='#1a1a2e', align=1, after=4)
-    sub_s     = s('su', 9, color='#666666', align=1, after=16)
-    section_s = s('se', 12, bold=True, color='#1a1a2e', before=14, after=6)
-    item_s    = s('it', 9, color='#444444', indent=12, after=3)
-    label_s   = s('la', 9, bold=True, color='#1a1a2e', after=2)
+    title_s   = create_style('ti', 22, bold=True, color=primary_color, align=0, after=2)
+    sub_s     = create_style('su', 9, color='#64748B', align=0, after=8)
+    section_s = create_style('se', 11, bold=True, color='#0F172A', before=12, after=6)
+    body_s    = create_style('bo', 9, color='#334155', leading=13, after=4)
+    item_s    = create_style('it', 9, color='#334155', indent=4, after=3, leading=13)
+    card_val  = create_style('cv', 18, bold=True, color=accent_color, align=1, after=2)
+    card_lbl  = create_style('cl', 8, bold=True, color='#64748B', align=1, after=0)
 
+    # Fetch Data
     pages = CrawledPage.objects.filter(audit=audit)
     issues = SEOIssues.objects.filter(audit=audit)
     total_pages = pages.count()
@@ -40,139 +64,212 @@ def generate_pdf_report(audit, branding=None):
     critical_issues = issues.filter(issue_type='ERROR').count()
     warnings = issues.filter(issue_type='WARNING').count()
 
+    overall_score = getattr(audit, 'overall_Score', getattr(audit, 'overall_score', 0)) or 0
     performance_score = int(pages.aggregate(avg=Avg('performance_score'))['avg'] or 0)
     mobile_score = int(pages.filter(is_mobile_friendly=True).count() / max(total_pages, 1) * 100)
     security_score = int(pages.filter(has_valid_SSL=True).count() / max(total_pages, 1) * 100)
 
     story = []
 
-    # ── HEADER ──
-    story.append(Paragraph(company_name, title_s))
+    # ── 1. BRAND HEADER ──
+    header_table_data = [
+        [
+            Paragraph(f"<b>{company_name}</b>", title_s),
+            Paragraph("<b>SEO AUDIT REPORT</b>", create_style('hdr_r', 12, bold=True, color=accent_color, align=2))
+        ],
+        [
+            Paragraph(f"Website: <b>{audit.website}</b> | Date: {audit.started_at.strftime('%d %b %Y')}", sub_s),
+            Paragraph(f"Audit ID: #{audit.id}", create_style('hdr_sub_r', 9, color='#64748B', align=2))
+        ]
+    ]
+    header_table = Table(header_table_data, colWidths=[340, 180])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(header_table)
     story.append(Spacer(1, 8))
-    story.append(Paragraph("SEO AUDIT REPORT", s('st', 13, bold=True, color='#1a1a2e', align=1)))
+    story.append(HRFlowable(width="100%", thickness=2, color=accent_color, spaceBefore=0, spaceAfter=12))
+
+    # ── 2. EXECUTIVE SUMMARY (METRIC CARDS GRID) ──
+    story.append(Paragraph("EXECUTIVE SUMMARY", section_s))
+    
+    # Grid Row 1: High Level KPIs
+    cards_data_1 = [
+        [
+            [Paragraph(f"{overall_score}/100", card_val), Paragraph("OVERALL SEO SCORE", card_lbl)],
+            [Paragraph(f"{total_pages}", card_val), Paragraph("PAGES CRAWLED", card_lbl)],
+            [Paragraph(f"{total_issues}", card_val), Paragraph("TOTAL ISSUES", card_lbl)],
+            [Paragraph(f"{critical_issues}", create_style('cv_red', 18, bold=True, color='#DC2626', align=1)), Paragraph("CRITICAL ERRORS", card_lbl)],
+        ]
+    ]
+    
+    t_cards_1 = Table(cards_data_1, colWidths=[127, 127, 127, 127])
+    t_cards_1.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), bg_light),
+        ('BOX', (0,0), (0,0), 1, card_border),
+        ('BOX', (1,0), (1,0), 1, card_border),
+        ('BOX', (2,0), (2,0), 1, card_border),
+        ('BOX', (3,0), (3,0), 1, card_border),
+        ('PADDING', (0,0), (-1,-1), 8),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    story.append(t_cards_1)
     story.append(Spacer(1, 8))
-    story.append(Paragraph(
-        f"Website: {audit.website} | Generated: {audit.started_at.strftime('%d %B %Y')}",
-        sub_s))
-    story.append(Spacer(1, 8))
-    story.append(HRFlowable(width="100%", thickness=2, color=primary_color))
+
+    # Grid Row 2: Secondary Category Scores
+    cards_data_2 = [
+        [
+            [Paragraph(f"{performance_score}/100", create_style('cv_sub', 13, bold=True, color=primary_color, align=1)), Paragraph("Performance", card_lbl)],
+            [Paragraph(f"{mobile_score}%", create_style('cv_sub', 13, bold=True, color=primary_color, align=1)), Paragraph("Mobile Friendly", card_lbl)],
+            [Paragraph(f"{security_score}%", create_style('cv_sub', 13, bold=True, color=primary_color, align=1)), Paragraph("Security Score", card_lbl)],
+            [Paragraph(f"{warnings}", create_style('cv_sub', 13, bold=True, color='#D97706', align=1)), Paragraph("Warnings", card_lbl)],
+        ]
+    ]
+    t_cards_2 = Table(cards_data_2, colWidths=[127, 127, 127, 127])
+    t_cards_2.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FFFFFF')),
+        ('BOX', (0,0), (0,0), 0.5, card_border),
+        ('BOX', (1,0), (1,0), 0.5, card_border),
+        ('BOX', (2,0), (2,0), 0.5, card_border),
+        ('BOX', (3,0), (3,0), 0.5, card_border),
+        ('PADDING', (0,0), (-1,-1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    story.append(t_cards_2)
     story.append(Spacer(1, 12))
 
-    # ── EXECUTIVE SUMMARY ──
-    story.append(Paragraph("EXECUTIVE SUMMARY", section_s))
-    scores_data = [
-    ['Overall SEO Score', f"{audit.overall_Score or 'N/A'}/100"],
-    ['Performance Score', f"{performance_score or 'N/A'}/100"],
-    ['Mobile Score', f"{mobile_score or 'N/A'}/100"],
-    ['Security Score', f"{security_score or 'N/A'}/100"],
-    ['Total Pages Crawled', str(total_pages)],
-    ['Total Issues', str(total_issues)],
-    ['Critical Issues', str(critical_issues)],
-    ['Warnings', str(warnings)],
-]
-    t = Table(scores_data, colWidths=[300, 150])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8f9fa')),
-        ('TEXTCOLOR', (1,0), (1,-1), primary_color),
-        ('FONTNAME', (1,0), (1,-1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 10),
-        ('PADDING', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
-    ]))
-    story.append(t)
+    # Helper for Section Titles with Left Accent
+    def add_section_header(title_text):
+        hdr_data = [[
+            Paragraph(f"<b>{title_text}</b>", create_style('sh', 10, bold=True, color='#FFFFFF'))
+        ]]
+        hdr_table = Table(hdr_data, colWidths=[520])
+        hdr_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), primary_color),
+            ('PADDING', (0,0), (-1,-1), 5),
+            ('LEFTPADDING', (0,0), (-1,-1), 8),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        return hdr_table
+
+    first_page = pages.first()
+
+    # ── 3. TECHNICAL SEO & PERFORMANCE ──
+    story.append(add_section_header("TECHNICAL SEO & CORE WEB VITALS"))
+    story.append(Spacer(1, 4))
+    
+    sitemap_status = "Found" if getattr(audit, 'has_sitemap', False) else "Missing"
+    robots_status = "Found" if getattr(audit, 'has_robots', False) else "Missing"
+    
+    tech_info = f"<b>Sitemap:</b> {sitemap_status} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Robots.txt:</b> {robots_status}"
+    story.append(Paragraph(tech_info, item_s))
+
+    if first_page:
+        cwv_data = [
+            ["Metric", "Value", "Metric", "Value"],
+            ["LCP (Largest Contentful Paint)", f"{getattr(first_page, 'largest_contentful_paint', 'N/A')}s", "FID (First Input Delay)", f"{getattr(first_page, 'first_input_delay', 'N/A')}ms"],
+            ["CLS (Cumulative Layout Shift)", f"{getattr(first_page, 'cumulative_layout_shift', 'N/A')}", "FCP (First Contentful Paint)", f"{getattr(first_page, 'first_contentful_paint', 'N/A')}s"],
+            ["TTFB (Time to First Byte)", f"{getattr(first_page, 'time_to_first_byte', 'N/A')}s", "Word Count (Avg)", f"{getattr(first_page, 'word_count', 'N/A')} words"]
+        ]
+        cwv_table = Table(cwv_data, colWidths=[170, 90, 170, 90], repeatRows=1)
+        cwv_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), bg_light),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('TEXTCOLOR', (0,0), (-1,-1), text_dark),
+            ('PADDING', (0,0), (-1,-1), 4),
+            ('GRID', (0,0), (-1,-1), 0.5, card_border),
+        ]))
+        story.append(cwv_table)
     story.append(Spacer(1, 10))
 
-    # ── TECHNICAL SEO ──
-    story.append(Paragraph("TECHNICAL SEO", section_s))
-    story.append(Paragraph(f"- Sitemap.xml: {'✅ Found' if audit.has_sitemap else '❌ Missing'}", item_s))
-    story.append(Paragraph(f"- Robots.txt: {'✅ Found' if audit.has_robots else '❌ Missing'}", item_s))
-
-    # ── PERFORMANCE ──
-    story.append(Paragraph("PERFORMANCE (Core Web Vitals)", section_s))
-    first_page = pages.first()
+    # ── 4. MOBILE & SECURITY ──
+    story.append(add_section_header("MOBILE FRIENDLINESS & SECURITY"))
+    story.append(Spacer(1, 4))
     if first_page:
-        story.append(Paragraph(f"- LCP (Largest Contentful Paint): {first_page.largest_contentful_paint}s", item_s))
-        story.append(Paragraph(f"- FID (First Input Delay): {first_page.first_input_delay}ms", item_s))
-        story.append(Paragraph(f"- CLS (Cumulative Layout Shift): {first_page.cumulative_layout_shift}", item_s))
-        story.append(Paragraph(f"- FCP (First Contentful Paint): {first_page.first_contentful_paint}s", item_s))
-        story.append(Paragraph(f"- TTFB (Time to First Byte): {first_page.time_to_first_byte}s", item_s))
+        sec_data = [
+            ["Check Item", "Status", "Check Item", "Status"],
+            ["Mobile Responsive", "Yes" if getattr(first_page, 'is_mobile_friendly', False) else "No", "SSL Certificate", "Valid" if getattr(first_page, 'has_valid_SSL', False) else "Invalid"],
+            ["Viewport Tag", "Configured" if getattr(first_page, 'has_mobile_viewport_configuration', False) else "Missing", "HTTPS / HSTS", "Yes" if getattr(first_page, 'has_strict_transport_security', False) else "No"],
+            ["Font Readability", "Good" if getattr(first_page, 'mobile_font_readability', False) else "Low", "Content Security Policy", "Enabled" if getattr(first_page, 'has_content_security_policy', False) else "Missing"]
+        ]
+        sec_table = Table(sec_data, colWidths=[170, 90, 170, 90], repeatRows=1)
+        sec_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), bg_light),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('TEXTCOLOR', (0,0), (-1,-1), text_dark),
+            ('PADDING', (0,0), (-1,-1), 4),
+            ('GRID', (0,0), (-1,-1), 0.5, card_border),
+        ]))
+        story.append(sec_table)
+    story.append(Spacer(1, 10))
 
-    # ── MOBILE SEO ──
-    story.append(Paragraph("MOBILE SEO", section_s))
-    if first_page:
-        story.append(Paragraph(f"- Mobile Friendly: {'✅ Yes' if first_page.is_mobile_friendly else '❌ No'}", item_s))
-        story.append(Paragraph(f"- Viewport Configured: {'✅ Yes' if first_page.has_mobile_viewport_configuration else '❌ No'}", item_s))
-        story.append(Paragraph(f"- Font Readability: {'✅ Yes' if first_page.mobile_font_readability else '❌ No'}", item_s))
-        story.append(Paragraph(f"- Tap Targets: {'✅ Yes' if first_page.mobile_tap_targets else '❌ No'}", item_s))
-
-    # ── SECURITY ──
-    story.append(Paragraph("SECURITY", section_s))
-    if first_page:
-        story.append(Paragraph(f"- SSL Certificate: {'✅ Valid' if first_page.has_valid_SSL else '❌ Invalid'}", item_s))
-        story.append(Paragraph(f"- HTTPS (HSTS): {'✅ Yes' if first_page.has_strict_transport_security else '❌ No'}", item_s))
-        story.append(Paragraph(f"- Content Security Policy: {'✅ Yes' if first_page.has_content_security_policy else '❌ No'}", item_s))
-        story.append(Paragraph(f"- X-Frame-Options: {'✅ Yes' if first_page.has_x_frame_options else '❌ No'}", item_s))
-        story.append(Paragraph(f"- Mixed Content: {'❌ Found' if first_page.has_mixed_content else '✅ None'}", item_s))
-
-    # ── LINK ANALYSIS ──
-    story.append(Paragraph("LINK ANALYSIS", section_s))
-    total_broken = sum(p.broken_links_count for p in pages)
-    total_external = sum(p.external_links_count for p in pages)
-    story.append(Paragraph(f"- Broken Links: {total_broken}", item_s))
-    story.append(Paragraph(f"- External Links: {total_external}", item_s))
-
-    # ── AI RECOMMENDATIONS ──
-    story.append(Paragraph("AI RECOMMENDATIONS", section_s))
-    if audit.ai_recommendation:
-      story.append(Paragraph(str(audit.ai_recommendation)[:1000], item_s))
+    # ── 5. AI RECOMMENDATIONS ──
+    story.append(add_section_header("AI RECOMMENDATIONS"))
+    story.append(Spacer(1, 4))
+    ai_rec = getattr(audit, 'ai_recommendation', None)
+    if ai_rec:
+        story.append(Paragraph(str(ai_rec)[:1200], body_s))
     else:
-       story.append(Paragraph("AI analysis will be available after audit completion.", item_s))
+        story.append(Paragraph("AI Recommendations and action items will be updated post full-crawl evaluation.", body_s))
+    story.append(Spacer(1, 10))
 
-    # ── CRITICAL ISSUES ──
-    story.append(Paragraph("CRITICAL ISSUES", section_s))
-    error_issues = issues.filter(issue_type='ERROR')[:10]
-    warning_issues = issues.filter(issue_type='WARNING')[:10]
+    # ── 6. CRITICAL ISSUES ──
+    story.append(add_section_header("CRITICAL ISSUES & WARNINGS"))
+    story.append(Spacer(1, 4))
+    error_issues = issues.filter(issue_type='ERROR')[:8]
+    warning_issues = issues.filter(issue_type='WARNING')[:8]
 
     if error_issues:
-      for issue in error_issues:
-        story.append(Paragraph(f"❌ {issue.description}", item_s))
-    elif warning_issues:
+        for issue in error_issues:
+            desc = getattr(issue, 'description', getattr(issue, 'issue_description', ''))
+            story.append(Paragraph(f"<font color='#DC2626'><b>[CRITICAL]</b></font> {desc}", item_s))
+    if warning_issues:
         for issue in warning_issues:
-           story.append(Paragraph(f"⚠️ {issue.description}", item_s))
-    else:
-        story.append(Paragraph("✅ No critical issues found!", item_s))
+            desc = getattr(issue, 'description', getattr(issue, 'issue_description', ''))
+            story.append(Paragraph(f"<font color='#D97706'><b>[WARNING]</b></font> {desc}", item_s))
+    if not error_issues and not warning_issues:
+        story.append(Paragraph("Great job! No critical errors or warnings were found on the site.", item_s))
+    
+    story.append(Spacer(1, 10))
 
-    # ── PAGE BY PAGE ──
-    story.append(Paragraph("PAGE-BY-PAGE BREAKDOWN", section_s))
-    page_data = [['URL', 'Status', 'On-Page', 'Technical', 'Performance']]
-    for p in pages[:20]:
-        url = str(p.url)[:50] + '...' if len(str(p.url)) > 50 else str(p.url)
+    # ── 7. PAGE-BY-PAGE BREAKDOWN TABLE ──
+    page_data = [['Page URL', 'Status', 'On-Page', 'Technical', 'Performance']]
+    for p in pages[:25]:
+        p_url = str(getattr(p, 'url', ''))
+        short_url = p_url[:45] + '...' if len(p_url) > 45 else p_url
         page_data.append([
-            url,
-            str(p.status_code),
-            str(p.on_page_score or 0),
-            str(p.technical_score or 0),
-            str(p.performance_score or 0),
+            short_url,
+            str(getattr(p, 'status_code', '-')),
+            f"{getattr(p, 'on_page_score', 0)}/100",
+            f"{getattr(p, 'technical_score', 0)}/100",
+            f"{getattr(p, 'performance_score', 0)}/100",
         ])
-    pt = Table(page_data, colWidths=[220, 50, 60, 60, 60])
+
+    pt = Table(page_data, colWidths=[240, 50, 76, 76, 78], repeatRows=1)
     pt.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), primary_color),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('BACKGROUND', (0,0), (-1,0), bg_light),
+        ('TEXTCOLOR', (0,0), (-1,0), primary_color),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('PADDING', (0,0), (-1,-1), 6),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f8f9fa')]),
+        ('PADDING', (0,0), (-1,-1), 5),
+        ('ALIGN', (1,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, card_border),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#FFFFFF'), bg_light]),
     ]))
+
+    story.append(add_section_header("PAGE-BY-PAGE BREAKDOWN"))
+    story.append(Spacer(1, 4))
     story.append(pt)
 
-    # ── FOOTER ──
+    # ── 8. FOOTER ──
     story.append(Spacer(1, 16))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#cccccc')))
-    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=card_border, spaceBefore=4, spaceAfter=8))
     story.append(Paragraph(
-        f"Generated by {company_name} | {audit.website}",
-        s('ft', 8, color='#999999', align=1)
+        f"Automated SEO Report Generated by <b>{company_name}</b> &nbsp;|&nbsp; Target: {audit.website}",
+        create_style('ft', 8, color='#94A3B8', align=1)
     ))
 
     doc.build(story)
