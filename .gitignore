@@ -3,14 +3,26 @@
 # ==========================================
 
 # ------------------------------------------
-# Frontend Ignores
+# IDE & Editor Files
 # ------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ------------------------------------------
+# Node Dependencies & Build Artifacts (Global)
+# ------------------------------------------
+node_modules/
+**/node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/build/
 frontend/.vite/
 frontend/.cache/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 frontend/*.log
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
