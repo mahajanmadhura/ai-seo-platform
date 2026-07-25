@@ -3,7 +3,7 @@ import { getAdminAnalytics } from '../../services/admin';
 import {
   Users,
   Coins,
-  DollarSign,
+  IndianRupee,
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
@@ -72,11 +72,11 @@ export default function AdminDashboardView() {
       desc: 'Registered platform accounts'
     },
     {
-      title: 'Total Revenue',
-      value: analytics?.total_revenue !== undefined ? `$${Number(analytics.total_revenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not Available',
-      icon: DollarSign,
+      title: 'Total Revenue (INR)',
+      value: analytics?.total_revenue !== undefined ? `₹${Number(analytics.total_revenue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not Available',
+      icon: IndianRupee,
       color: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
-      desc: 'Successful checkout aggregates'
+      desc: 'Successful checkout aggregates in INR'
     },
     {
       title: 'Total Credits Sold',

@@ -84,8 +84,13 @@ export default function ReportDetail() {
   };
 
   const domain = audit?.website_domain || 'website';
+  const isAuditDone = audit?.status === 'DONE';
 
   const handleDownloadPDF = async () => {
+    if (!isAuditDone) {
+      addToast('Audit is still in progress. Please wait for completion before downloading reports.', 'error');
+      return;
+    }
     setLoadingAction('pdf');
     const filename = getCleanFilename(domain, 'pdf');
     const res = await downloadReport(auditId, filename);
@@ -108,6 +113,10 @@ export default function ReportDetail() {
   };
 
   const handleExportCSV = async () => {
+    if (!isAuditDone) {
+      addToast('Audit is still in progress. Please wait for completion before downloading reports.', 'error');
+      return;
+    }
     setLoadingAction('csv');
     const filename = getCleanFilename(domain, 'csv');
     const res = await exportCSV(auditId, filename);
@@ -120,6 +129,10 @@ export default function ReportDetail() {
   };
 
   const handleExportJSON = async () => {
+    if (!isAuditDone) {
+      addToast('Audit is still in progress. Please wait for completion before downloading reports.', 'error');
+      return;
+    }
     setLoadingAction('json');
     const filename = getCleanFilename(domain, 'json');
     const res = await exportJSON(auditId, filename);
@@ -132,6 +145,10 @@ export default function ReportDetail() {
   };
 
   const handleSendEmailSubmit = async (recipientEmail) => {
+    if (!isAuditDone) {
+      addToast('Audit is still in progress. Please wait for completion before emailing reports.', 'error');
+      return;
+    }
     setLoadingAction('email');
     await generateReport(auditId);
     const res = await emailReport(auditId, recipientEmail);
@@ -160,9 +177,15 @@ export default function ReportDetail() {
             <ArrowLeft className="w-4 h-4" /> Back to {domain ? `${domain} History` : 'Reports'}
           </Link>
 
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#36E682]/10 border border-[#36E682]/30 text-[#053D34]">
-            <CheckCircle2 className="w-3.5 h-3.5 text-forest-green" /> Report Status: Ready
-          </span>
+          {isAuditDone ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#36E682]/10 border border-[#36E682]/30 text-[#053D34]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-forest-green" /> Report Status: Ready
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-800">
+              <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin" /> Audit In Progress
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -206,7 +229,9 @@ export default function ReportDetail() {
                   <div className="bg-[#E5F3EC] border border-deep-green/10 px-5 py-2.5 rounded-2xl text-center">
                     <span className="text-[9px] uppercase font-black tracking-wider text-muted-text block">SEO Score</span>
                     <span className="text-2xl font-black text-deep-green">
-                      {audit?.overall_score ?? 'N/A'}<span className="text-xs text-muted-text">/100</span>
+                      {isAuditDone && audit?.overall_score !== null && audit?.overall_score !== undefined
+                        ? audit.overall_score
+                        : 'N/A'}<span className="text-xs text-muted-text">/100</span>
                     </span>
                   </div>
                 </div>
@@ -249,16 +274,24 @@ export default function ReportDetail() {
                   <div className="min-w-0">
                     <span className="text-[10px] font-black uppercase text-emerald-900 block">Audit Started</span>
                     <span className="text-[9px] text-emerald-700 font-semibold truncate block">
-                      {audit?.started_at ? new Date(audit.started_at).toLocaleTimeString() : 'Completed'}
+                      {audit?.started_at ? new Date(audit.started_at).toLocaleTimeString() : 'Started'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200/60">
-                  <Check className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                <div className={`flex items-center gap-2.5 p-3 rounded-2xl border ${
+                  isAuditDone ? 'bg-emerald-50/60 border-emerald-200/60' : 'bg-amber-50/60 border-amber-200/60'
+                }`}>
+                  {isAuditDone ? (
+                    <Check className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-amber-600 flex-shrink-0 animate-spin" />
+                  )}
                   <div className="min-w-0">
-                    <span className="text-[10px] font-black uppercase text-emerald-900 block">Audit Completed</span>
-                    <span className="text-[9px] text-emerald-700 font-semibold block">Crawl Finished</span>
+                    <span className="text-[10px] font-black uppercase text-deep-green block">Audit Status</span>
+                    <span className="text-[9px] text-muted-text font-semibold block">
+                      {isAuditDone ? 'Crawl Finished' : 'Crawling In Progress'}
+                    </span>
                   </div>
                 </div>
 
@@ -274,11 +307,15 @@ export default function ReportDetail() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200/60">
-                  <Check className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                <div className={`flex items-center gap-2.5 p-3 rounded-2xl border ${
+                  isAuditDone ? 'bg-emerald-50/60 border-emerald-200/60' : 'bg-soft-bg border-border-color/40'
+                }`}>
+                  <Check className={`w-4 h-4 flex-shrink-0 ${isAuditDone ? 'text-emerald-700' : 'text-muted-text/40'}`} />
                   <div className="min-w-0">
-                    <span className="text-[10px] font-black uppercase text-emerald-900 block">Report Compiled</span>
-                    <span className="text-[9px] text-emerald-700 font-semibold block">Ready for Export</span>
+                    <span className="text-[10px] font-black uppercase text-deep-green block">Report Compiled</span>
+                    <span className="text-[9px] text-muted-text font-semibold block">
+                      {isAuditDone ? 'Ready for Export' : 'Pending Completion'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -337,13 +374,20 @@ export default function ReportDetail() {
                 </p>
               </div>
 
+              {!isAuditDone && (
+                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-amber-900">
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+                  <span>Audit Analysis in Progress. Reports will be enabled for download once crawling and scoring complete.</span>
+                </div>
+              )}
+
               {/* Responsive Bento Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {/* Download PDF - Primary Bento Tile */}
                 <button
                   onClick={handleDownloadPDF}
-                  disabled={loadingAction !== null}
-                  className="sm:col-span-2 lg:col-span-1 bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green p-4 rounded-2xl text-xs font-black transition-all flex items-center justify-between shadow-sm cursor-pointer disabled:opacity-50 group"
+                  disabled={!isAuditDone || loadingAction !== null}
+                  className="sm:col-span-2 lg:col-span-1 bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green p-4 rounded-2xl text-xs font-black transition-all flex items-center justify-between shadow-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-white/10 group-hover:bg-deep-green/10 flex items-center justify-center">
@@ -360,8 +404,8 @@ export default function ReportDetail() {
                 {/* Export CSV Bento Tile */}
                 <button
                   onClick={handleExportCSV}
-                  disabled={loadingAction !== null}
-                  className="bg-soft-bg hover:bg-mint-surface/80 text-deep-green border border-border-color/60 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-50"
+                  disabled={!isAuditDone || loadingAction !== null}
+                  className="bg-soft-bg hover:bg-mint-surface/80 text-deep-green border border-border-color/60 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-emerald-100/60 text-forest-green flex items-center justify-center">
@@ -378,8 +422,8 @@ export default function ReportDetail() {
                 {/* Export JSON Bento Tile */}
                 <button
                   onClick={handleExportJSON}
-                  disabled={loadingAction !== null}
-                  className="bg-soft-bg hover:bg-mint-surface/80 text-deep-green border border-border-color/60 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-50"
+                  disabled={!isAuditDone || loadingAction !== null}
+                  className="bg-soft-bg hover:bg-mint-surface/80 text-deep-green border border-border-color/60 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-blue-100/60 text-blue-600 flex items-center justify-center">
@@ -396,8 +440,8 @@ export default function ReportDetail() {
                 {/* Send Email Bento Tile */}
                 <button
                   onClick={() => setIsEmailModalOpen(true)}
-                  disabled={loadingAction !== null}
-                  className="bg-mint-surface hover:bg-deep-green text-deep-green hover:text-white border border-border-color/40 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-50 group"
+                  disabled={!isAuditDone || loadingAction !== null}
+                  className="bg-mint-surface hover:bg-deep-green text-deep-green hover:text-white border border-border-color/40 p-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-deep-green/10 group-hover:bg-white/20 flex items-center justify-center">

@@ -1,16 +1,22 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
   History,
   LogOut,
-  X
+  X,
+  Eye
 } from 'lucide-react';
 import LogoWhite from '../assets/White.png';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { switchViewMode } = useAuth();
+  const { addToast } = useToast();
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -21,6 +27,13 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
   const isActive = (path) => {
     if (path === '/admin') return location.pathname === '/admin';
     return location.pathname.startsWith(path);
+  };
+
+  const handleSwitchToUserWorkspace = () => {
+    setMobileOpen(false);
+    switchViewMode('user');
+    addToast('Switched to User Workspace — Testing platform as customer', 'success');
+    navigate('/dashboard');
   };
 
   const renderSidebarContent = () => (
@@ -43,7 +56,7 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
         )}
       </div>
 
-      <nav className="flex-grow p-4 space-y-1.5">
+      <nav className="flex-grow p-4 space-y-1.5 overflow-y-auto">
         {navItems.map((item) => {
           const active = isActive(item.path);
           const Icon = item.icon;
@@ -53,10 +66,11 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
               key={item.name}
               to={item.path}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-[12px] text-xs font-semibold tracking-wide transition-all ${active
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-[12px] text-xs font-semibold tracking-wide transition-all ${
+                active
                   ? 'bg-white text-black font-black'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
-                }`}
+              }`}
             >
               <Icon className="w-4 h-4" />
               <span>{item.name}</span>
@@ -65,7 +79,16 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
         })}
       </nav>
 
-      <div className="p-4 border-t border-neutral-900">
+      {/* Simple, standard bottom section right above Sign Out */}
+      <div className="p-4 border-t border-neutral-900 space-y-1">
+        <button
+          onClick={handleSwitchToUserWorkspace}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-[12px] text-xs font-semibold text-[#36E682] hover:bg-[#36E682]/10 transition-all cursor-pointer text-left"
+        >
+          <Eye className="w-4 h-4 text-[#36E682]" />
+          <span>User Workspace</span>
+        </button>
+
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-[12px] text-xs font-semibold text-red-500 hover:bg-red-950/15 hover:text-red-400 transition-all cursor-pointer text-left"

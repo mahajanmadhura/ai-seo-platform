@@ -67,7 +67,7 @@ export default function Reports() {
         latestAudit: latest,
         totalAudits: websiteAudits.length,
         totalReports: reportsCompiled.length,
-        latestScore: latest?.overall_score ?? 'N/A',
+        latestScore: (latest?.status === 'DONE' && latest?.overall_score !== null && latest?.overall_score !== undefined) ? latest.overall_score : 'N/A',
         lastAuditDate: latest?.started_at ? new Date(latest.started_at).toLocaleDateString() : 'N/A',
         lastReportDate: latest?.completed_at || latest?.started_at ? new Date(latest.completed_at || latest.started_at).toLocaleDateString() : 'N/A',
         reportStatus: reportsCompiled.length > 0 ? 'Ready' : 'Not Generated'
@@ -191,7 +191,11 @@ export default function Reports() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
                         <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Latest Score</span>
-                        <span className="text-base font-black text-deep-green">{group.latestScore}/100</span>
+                        <span className="text-base font-black text-deep-green">
+                          {group.latestScore !== 'N/A' && group.latestScore !== null && group.latestScore !== undefined
+                            ? `${group.latestScore}/100`
+                            : 'N/A'}
+                        </span>
                       </div>
 
                       <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">

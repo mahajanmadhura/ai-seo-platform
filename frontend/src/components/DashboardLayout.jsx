@@ -15,15 +15,18 @@ import {
   Plus,
   User,
   Shield,
-  CreditCard
+  CreditCard,
+  ArrowRight
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import LogoWhite from '../assets/White.png';
 import AddWebsiteModal from '../client/websites/components/AddWebsiteModal';
 import DashboardFooter from './DashboardFooter';
 import PageTransition from './motion/PageTransition';
 
 export default function DashboardLayout({ children, title, cta, backLink }) {
-  const { user, logoutUser, credits, refreshCredits } = useAuth();
+  const { user, logoutUser, credits, refreshCredits, switchViewMode } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -127,6 +130,20 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
       </nav>
 
       <div className="p-4 border-t border-[#083D36] space-y-1">
+        {(user?.is_staff || user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'admin') && (
+          <button
+            onClick={() => {
+              setMobileOpen(false);
+              switchViewMode('admin');
+              addToast('Returned to Admin Panel — Administrative tools active', 'success');
+              navigate('/admin');
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold text-[#36E682] hover:bg-[#083D36] hover:text-white transition-all cursor-pointer text-left"
+          >
+            <Shield className="w-4 h-4 text-[#36E682]" />
+            <span>Admin Panel</span>
+          </button>
+        )}
         <Link
           to="/settings"
           onClick={() => setMobileOpen(false)}

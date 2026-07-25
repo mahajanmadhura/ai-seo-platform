@@ -9,6 +9,11 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState(null);
+  
+  // Future-Ready View Modes: 'admin' | 'user' | 'support' | 'auditor'
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('admin_view_mode') || 'admin';
+  });
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -40,8 +45,14 @@ export const AuthProvider = ({ children }) => {
   const handleLocalLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('admin_view_mode');
     setUser(null);
     setIsAuthenticated(false);
+  };
+
+  const switchViewMode = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('admin_view_mode', mode);
   };
 
   const loginUser = async (email, password) => {
@@ -90,6 +101,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const isAdminUser = Boolean(
+    user?.is_staff || user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'admin'
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -97,6 +112,9 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         loading,
         credits,
+        viewMode,
+        switchViewMode,
+        isAdminUser,
         refreshCredits,
         loginUser,
         logoutUser,

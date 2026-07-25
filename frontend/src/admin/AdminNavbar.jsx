@@ -10,7 +10,7 @@ export default function AdminNavbar({ setMobileOpen }) {
   const getPageTitle = () => {
     switch (location.pathname) {
       case '/admin':
-        return 'Dashboard';
+        return 'Admin Dashboard';
       case '/admin/users':
         return 'User Management';
       case '/admin/audit-logs':
@@ -28,7 +28,7 @@ export default function AdminNavbar({ setMobileOpen }) {
   };
 
   return (
-    <header className="bg-white border-b border-neutral-100 h-[72px] flex items-center justify-between px-8 sticky top-0 z-40 font-sans">
+    <header className="bg-white border-b border-neutral-100 h-[72px] flex items-center justify-between px-6 sm:px-8 sticky top-0 z-40 font-sans">
       <div className="flex items-center gap-4">
         <button
           onClick={() => setMobileOpen(true)}
@@ -36,7 +36,7 @@ export default function AdminNavbar({ setMobileOpen }) {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <span className="text-lg font-black text-neutral-900 tracking-tight pl-1">
+        <span className="text-base sm:text-lg font-black text-neutral-900 tracking-tight pl-1">
           {getPageTitle()}
         </span>
       </div>
@@ -59,12 +59,13 @@ export default function AdminNavbar({ setMobileOpen }) {
           <Bell className="w-[18px] h-[18px]" />
         </button>
 
-        <div className="h-6 w-px bg-neutral-200" />
+        <div className="h-6 w-px bg-neutral-200 hidden sm:block" />
 
+        {/* User Info Pill */}
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-xs font-black text-neutral-800 leading-none">
-              {user?.first_name || 'Admin'}
+              {user?.first_name || 'Administrator'}
             </p>
             <span className="inline-block text-[8px] font-black uppercase tracking-wider bg-neutral-100 text-neutral-500 border border-neutral-200 px-2 py-0.5 rounded-md mt-1.5">
               SUPER ADMIN
@@ -74,6 +75,7 @@ export default function AdminNavbar({ setMobileOpen }) {
             {getInitials()}
           </div>
         </div>
+
       </div>
     </header>
   );

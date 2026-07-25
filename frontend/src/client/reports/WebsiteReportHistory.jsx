@@ -145,7 +145,9 @@ export default function WebsiteReportHistory() {
                     <div className="md:hidden text-right">
                       <span className="text-[8px] font-black uppercase text-muted-text tracking-wider block">Score</span>
                       <span className="text-sm font-black text-deep-green">
-                        {audit.overall_score !== null && audit.overall_score !== undefined ? `${audit.overall_score}/100` : 'N/A'}
+                        {audit.status === 'DONE' && audit.overall_score !== null && audit.overall_score !== undefined
+                          ? `${audit.overall_score}/100`
+                          : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -193,7 +195,9 @@ export default function WebsiteReportHistory() {
                     <div className="hidden md:block text-left">
                       <span className="text-[9px] font-black uppercase text-muted-text tracking-wider block">SEO Score</span>
                       <span className="text-base font-black text-deep-green">
-                        {audit.overall_score !== null && audit.overall_score !== undefined ? `${audit.overall_score}/100` : 'N/A'}
+                        {audit.status === 'DONE' && audit.overall_score !== null && audit.overall_score !== undefined
+                          ? `${audit.overall_score}/100`
+                          : 'N/A'}
                       </span>
                     </div>
 

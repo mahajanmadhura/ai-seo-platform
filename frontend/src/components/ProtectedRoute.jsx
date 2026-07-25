@@ -4,12 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, isAdminUser, viewMode } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#121413] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#B8FF4D]" />
+      <div className="min-h-screen bg-[#EEF5F1] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#053D34]" />
       </div>
     );
   }
@@ -18,7 +18,9 @@ export const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.is_staff) {
+  // If administrator is in default 'admin' mode and visits a user route directly,
+  // redirect to admin panel. If viewMode is 'user', allow full customer workspace usage.
+  if (isAdminUser && viewMode === 'admin') {
     return <Navigate to="/admin" replace />;
   }
 
@@ -26,12 +28,12 @@ export const ProtectedRoute = ({ children }) => {
 };
 
 export const AdminProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, isAdminUser } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#121413] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#B8FF4D]" />
+      <div className="min-h-screen bg-[#0B0B0B] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#36E682]" />
       </div>
     );
   }
@@ -40,7 +42,7 @@ export const AdminProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!user?.is_staff) {
+  if (!isAdminUser) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -48,19 +50,18 @@ export const AdminProtectedRoute = ({ children }) => {
 };
 
 export const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isAdminUser, viewMode } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#121413] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#B8FF4D]" />
+      <div className="min-h-screen bg-[#EEF5F1] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#053D34]" />
       </div>
     );
   }
 
   if (isAuthenticated) {
-    const { user } = useAuth();
-    if (user?.is_staff) {
+    if (isAdminUser && viewMode === 'admin') {
       return <Navigate to="/admin" replace />;
     }
     return <Navigate to="/dashboard" replace />;

@@ -38,6 +38,12 @@ class GenerateReportView(APIView):
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        if audit.status != 'DONE':
+            return Response(
+                {'error': 'Audit is still in progress. Reports can only be generated after completion.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         branding = BrandingSettings.objects.filter(user=request.user).first()
 
         try:
@@ -59,6 +65,12 @@ class DownloadReportView(APIView):
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        if audit.status != 'DONE':
+            return Response(
+                {'error': 'Audit is still in progress. Reports can only be downloaded after completion.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         pdf_filename = get_pdf_filename(audit_id, audit.website)
         pdf_path = os.path.join(settings.MEDIA_ROOT, 'reports', 'pdfs', pdf_filename)
 
@@ -78,6 +90,12 @@ class EmailReportView(APIView):
             audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if audit.status != 'DONE':
+            return Response(
+                {'error': 'Audit is still in progress. Email reports can only be sent after completion.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         email_to = request.data.get('email')
         if not email_to:
@@ -234,6 +252,12 @@ class CSVExportView(APIView):
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        if audit.status != 'DONE':
+            return Response(
+                {'error': 'Audit is still in progress. CSV exports can only be downloaded after completion.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         branding = BrandingSettings.objects.filter(user=request.user).first()
         ctx = _build_report_context(audit, branding)
         s = ctx['summary']
@@ -321,6 +345,12 @@ class JSONExportView(APIView):
             audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if audit.status != 'DONE':
+            return Response(
+                {'error': 'Audit is still in progress. JSON exports can only be downloaded after completion.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         branding = BrandingSettings.objects.filter(user=request.user).first()
         ctx = _build_report_context(audit, branding)
