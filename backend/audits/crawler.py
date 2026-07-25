@@ -484,7 +484,7 @@ def fetch_core_web_vitals(url):
     headers = {"User-Agent": "AthenuraSEOAuditor/1.0"}
 
     try:
-        response = requests.get(api_url, timeout=30, headers=headers)
+        response = requests.get(api_url, timeout=60)
         data = response.json()
         
         # 1. Safely drill down to the "audits" folder. If anything is missing, return an empty dict {}

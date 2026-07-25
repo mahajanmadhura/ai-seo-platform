@@ -47,14 +47,19 @@ backend/*.sqlite3
 *.sqlite
 *.sqlite3
 
-# Generated Static/Media/Uploads/Reports
+# Generated Media, PDF Reports, CSV & Data Exports
+*.pdf
+**/*.pdf
 backend/static/
 backend/media/
 backend/uploads/
 backend/reports/
+backend/reports/pdfs/
 backend/audits/reports/
-*.pdf
-backend/*.pdf
+media/
+**/media/
+**/media/**
+**/reports/pdfs/
 
 # Celery & PID
 backend/celerybeat-schedule

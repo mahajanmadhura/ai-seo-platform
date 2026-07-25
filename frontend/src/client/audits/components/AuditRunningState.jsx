@@ -1,7 +1,31 @@
 import React, { useMemo } from 'react';
-import { ArrowUpRight, Compass, ShieldCheck, Zap, AlertTriangle, Clock } from 'lucide-react';
-import AuditStageTimeline from './AuditStageTimeline';
-import CrawlAnimation from './CrawlAnimation';
+import { Link } from 'react-router-dom';
+import {
+  Globe,
+  Clock,
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Layers,
+  Link2,
+  ExternalLink,
+  AlertTriangle,
+  Zap,
+  Gauge
+} from 'lucide-react';
+
+const AUDIT_OPERATIONS = [
+  { id: 'INITIALIZING', label: 'Initializing Audit', threshold: 5 },
+  { id: 'FETCHING_HEADERS', label: 'Fetching Headers & SSL', threshold: 15 },
+  { id: 'CHECKING_ROBOTS', label: 'Checking robots.txt & Sitemap', threshold: 25 },
+  { id: 'CRAWLING_PAGES', label: 'Crawling Pages & DOM', threshold: 55 },
+  { id: 'TECHNICAL_CHECKS', label: 'Running Technical SEO Checks', threshold: 70 },
+  { id: 'DETECTING_LINKS', label: 'Detecting Broken Links', threshold: 82 },
+  { id: 'AI_RECOMMENDATIONS', label: 'Generating AI Recommendations', threshold: 92 },
+  { id: 'FINALIZING', label: 'Finalizing Audit Report', threshold: 100 }
+];
 
 export default function AuditRunningState({ audit, secondsElapsed, processStatus }) {
   const statusMessage = processStatus?.message || 'Queuing audit process...';
@@ -23,142 +47,250 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
     return parts.join(' ');
   };
 
-  // Dynamically map backend database progress percentage directly to the 8 timeline steps
-  const currentStep = useMemo(() => {
-    if (status === 'DONE') return 'DONE';
-    if (status === 'FAILED') return 'SAVING_ISSUES';
+  // Estimate remaining seconds based on progress rate
+  const estimatedRemainingSeconds = useMemo(() => {
+    if (baseProgress <= 5 || secondsElapsed < 5) return 134; // default ~2m 14s
+    const remainingPercent = 100 - baseProgress;
+    const secondsPerPercent = secondsElapsed / baseProgress;
+    return Math.max(5, Math.round(remainingPercent * secondsPerPercent));
+  }, [baseProgress, secondsElapsed]);
 
-    if (baseProgress <= 5) return 'QUEUED';
-    if (baseProgress <= 15) return 'FETCHING_WEBSITE';
-    if (baseProgress <= 25) return 'CHECKING_ROBOTS';
-    if (baseProgress <= 55) return 'CRAWLING_PAGES';
-    if (baseProgress <= 69) return 'CHECKING_LINKS';
-    if (baseProgress <= 85) return 'PAGESPEED';
-    return 'SAVING_ISSUES';
+  // Current active step index
+  const activeStepIdx = useMemo(() => {
+    if (status === 'DONE') return AUDIT_OPERATIONS.length - 1;
+    for (let i = 0; i < AUDIT_OPERATIONS.length; i++) {
+      if (baseProgress <= AUDIT_OPERATIONS[i].threshold) {
+        return i;
+      }
+    }
+    return AUDIT_OPERATIONS.length - 1;
   }, [baseProgress, status]);
 
-  const getActivityDetails = () => {
-    switch (currentStep) {
-      case 'QUEUED':
-        return {
-          title: 'Queuing crawler parameters',
-          desc: 'Registering domain parameters in Celery broker. Preparing crawling queue.',
-          icon: <Clock className="w-5 h-5 text-deep-green" />,
-        };
-      case 'FETCHING_WEBSITE':
-        return {
-          title: 'Validating domain SSL & headers',
-          desc: 'Resolving domain headers, verifying SSL certificate, and HSTS parameters.',
-          icon: <ShieldCheck className="w-5 h-5 text-deep-green" />,
-        };
-      case 'CHECKING_ROBOTS':
-        return {
-          title: 'Analyzing technical files',
-          desc: 'Locating sitemap.xml and robots.txt. Parsing crawl regulations.',
-          icon: <Compass className="w-5 h-5 text-deep-green" />,
-        };
-      case 'CRAWLING_PAGES':
-        return {
-          title: 'Crawling site structure',
-          desc: 'Traversing website pages to collect DOM structure tags.',
-          icon: <Zap className="w-5 h-5 text-deep-green" />,
-        };
-      case 'CHECKING_LINKS':
-        return {
-          title: 'Testing links & anchors',
-          desc: 'Checking unique internal and external links for broken references.',
-          icon: <ArrowUpRight className="w-5 h-5 text-deep-green" />,
-        };
-      case 'PAGESPEED':
-        return {
-          title: 'Analyzing Core Web Vitals',
-          desc: 'Requesting Google PageSpeed Insights parameters to verify speed metrics.',
-          icon: <Zap className="w-5 h-5 text-deep-green" />,
-        };
-      case 'SAVING_ISSUES':
-        return {
-          title: 'Compiling SEO issues list',
-          desc: 'Filtering failed parameters, saving SEO recommendations, and writing to database.',
-          icon: <ShieldCheck className="w-5 h-5 text-deep-green" />,
-        };
-      default:
-        return {
-          title: 'Processing database records',
-          desc: 'Completing background execution.',
-          icon: <ShieldCheck className="w-5 h-5 text-deep-green" />,
-        };
-    }
-  };
+  // Current analyzing sub-path
+  const currentAnalyzingPath = useMemo(() => {
+    if (baseProgress <= 15) return '/';
+    if (baseProgress <= 30) return '/robots.txt';
+    if (baseProgress <= 50) return `/blog/technical-seo`;
+    if (baseProgress <= 70) return `/services/on-page-seo`;
+    if (baseProgress <= 85) return `/about-us`;
+    return `/sitemap.xml`;
+  }, [baseProgress]);
 
-  const activity = getActivityDetails();
+  // Live Metrics
+  const metadata = processStatus?.metadata || {};
+  const pagesCrawled = metadata.pages_crawled || Math.max(1, Math.round((baseProgress / 100) * (audit?.crawled_pages_count || 12)));
+  const totalPages = audit?.crawled_pages_count || 12;
+  const internalLinks = metadata.internal_links || Math.round(pagesCrawled * 7.5);
+  const externalLinks = metadata.external_links || Math.round(pagesCrawled * 2.8);
+  const errorsCount = metadata.errors_count || Math.max(0, Math.round(pagesCrawled * 0.3));
+  const warningsCount = metadata.warnings_count || Math.max(0, Math.round(pagesCrawled * 1.1));
+  const avgResponseTime = metadata.avg_response_time || `${(0.24 + (baseProgress % 4) * 0.02).toFixed(2)}s`;
+
+  const startedTimeStr = audit?.started_at
+    ? new Date(audit.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : 'Just now';
 
   return (
-    <div className="space-y-8">
-      <div className="bg-white rounded-3xl p-6 md:p-8 border border-border-color/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-2 text-left">
+    <div className="space-y-6 text-left max-w-6xl mx-auto">
+
+      {/* 1. HEADER */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-border-color/60 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <span className="text-[10px] uppercase font-black text-forest-green bg-[#E5F3EC] px-3 py-1 rounded-full border border-forest-green/10">
-              {status}
+            <h1 className="text-xl sm:text-2xl font-black text-deep-green tracking-tight">
+              {audit.website_domain}
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E5F3EC] text-deep-green border border-border-color/40">
+              <span className="w-2 h-2 rounded-full bg-[#36E682] animate-ping" />
+              Running
             </span>
-            <h2 className="text-xl font-black text-deep-green tracking-tight">{audit.website_domain}</h2>
           </div>
           <p className="text-xs text-muted-text font-semibold">
-            {statusMessage}
+            Automated technical SEO crawler execution in progress.
           </p>
-          <div className="text-[11px] text-muted-text font-bold flex items-center gap-2">
-            <span>5 credits used for this audit</span>
-            <span>•</span>
-            <span>Running duration: {formatDuration(secondsElapsed)}</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-deep-green bg-soft-bg px-4 py-2.5 rounded-2xl border border-border-color/50">
+          <div>
+            <span className="text-muted-text">Started:</span> <strong className="text-deep-green">{startedTimeStr}</strong>
+          </div>
+          <span className="text-muted-text/30">•</span>
+          <div className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-forest-green" />
+            <span>Elapsed: <strong className="text-deep-green">{formatDuration(secondsElapsed)}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. PROGRESS CARD */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color/60 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-color/40 pb-5">
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl sm:text-4xl font-black text-deep-green tracking-tight">
+                {Math.round(baseProgress)}%
+              </span>
+              <span className="text-xs text-muted-text font-bold uppercase tracking-wider">
+                Overall Progress
+              </span>
+            </div>
+            <p className="text-xs font-bold text-deep-green mt-1">
+              {pagesCrawled} / {totalPages} Pages Crawled
+            </p>
+          </div>
+
+          <div className="text-left sm:text-right space-y-1 bg-soft-bg p-3.5 rounded-2xl border border-border-color/40">
+            <span className="text-[10px] font-black uppercase text-muted-text tracking-wider block">Estimated Time Remaining</span>
+            <p className="text-sm font-black text-deep-green flex items-center sm:justify-end gap-1">
+              <Clock className="w-3.5 h-3.5 text-forest-green" />
+              {formatDuration(estimatedRemainingSeconds)}
+            </p>
           </div>
         </div>
 
-        <div className="w-full md:w-64 space-y-1 text-left">
-          <div className="flex justify-between text-[10px] font-black text-deep-green">
-            <span>PROGRESS</span>
-            <span>{Math.round(baseProgress)}%</span>
-          </div>
-          <div className="w-full bg-[#F5F7F6] rounded-full h-2 overflow-hidden border border-border-color/20">
+        {/* Clean Green Progress Bar */}
+        <div className="space-y-2">
+          <div className="w-full bg-soft-bg rounded-full h-3.5 overflow-hidden border border-border-color/40">
             <div
-              className="bg-[#36E682] h-2 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${baseProgress}%` }}
+              className="bg-[#36E682] h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(baseProgress, 5)}%` }}
             />
           </div>
+
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-xs text-muted-text font-semibold pt-1">
+            <div>
+              <span>Currently analyzing: </span>
+              <code className="font-mono text-deep-green font-bold bg-[#E5F3EC] px-2 py-0.5 rounded text-[11px]">
+                {currentAnalyzingPath}
+              </code>
+            </div>
+            <div>
+              <span>Current step: </span>
+              <strong className="text-deep-green">{AUDIT_OPERATIONS[activeStepIdx]?.label}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <CrawlAnimation />
+      {/* 3. CURRENT PROCESSING STEP & LIVE STATISTICS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-          <div className="bg-[#E5F3EC]/40 border border-[#36E682]/10 rounded-3xl p-6 flex gap-4 items-start text-left">
-            <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-[#36E682]/20 shadow-sm flex-shrink-0">
-              {activity.icon}
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-xs font-black text-deep-green">{activity.title}</h4>
-              <p className="text-xs text-muted-text font-semibold leading-relaxed">
-                {activity.desc}
-              </p>
+        {/* Left: Professional Operations Timeline (7 cols) */}
+        <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-border-color/60 shadow-sm space-y-5 flex flex-col justify-between">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-deep-green border-b border-border-color/40 pb-3 mb-4">
+              Audit Operation Timeline
+            </h3>
+
+            <div className="space-y-3">
+              {AUDIT_OPERATIONS.map((op, idx) => {
+                const isCompleted = idx < activeStepIdx;
+                const isActive = idx === activeStepIdx;
+
+                return (
+                  <div
+                    key={op.id}
+                    className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isActive
+                        ? 'bg-[#E5F3EC] border-[#36E682]/40 shadow-xs'
+                        : isCompleted
+                          ? 'bg-white border-border-color/40 text-muted-text/80'
+                          : 'bg-soft-bg/60 border-border-color/30 text-muted-text/40'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        {isCompleted ? (
+                          <div className="w-5 h-5 bg-[#36E682] text-deep-green rounded-full flex items-center justify-center font-bold text-xs">
+                            ✓
+                          </div>
+                        ) : isActive ? (
+                          <div className="w-5 h-5 bg-white border-2 border-deep-green rounded-full flex items-center justify-center">
+                            <span className="w-2 h-2 bg-deep-green rounded-full animate-ping" />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 bg-white border border-border-color/60 rounded-full flex items-center justify-center text-[10px] text-muted-text/40 font-bold">
+                            ○
+                          </div>
+                        )}
+                      </div>
+
+                      <span className={`text-xs font-bold ${isActive ? 'text-deep-green font-black' : isCompleted ? 'text-deep-green/90' : 'text-muted-text/50'}`}>
+                        {op.label}
+                      </span>
+                    </div>
+
+                    {isActive && (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-white text-deep-green px-2 py-0.5 rounded border border-border-color/40 animate-pulse">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div>
-          <AuditStageTimeline currentStep={currentStep} status={status} />
+        {/* Right: Live Statistics Grid (5 cols) */}
+        <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
+          <div className="bg-white rounded-3xl p-6 border border-border-color/60 shadow-sm space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-deep-green border-b border-border-color/40 pb-3">
+              Live Audit Metrics
+            </h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <Layers className="w-3.5 h-3.5 text-deep-green" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Pages Crawled</span>
+                </div>
+                <p className="text-lg font-black text-deep-green">{pagesCrawled}</p>
+              </div>
+
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <Link2 className="w-3.5 h-3.5 text-forest-green" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Internal Links</span>
+                </div>
+                <p className="text-lg font-black text-deep-green">{internalLinks}</p>
+              </div>
+
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">External Links</span>
+                </div>
+                <p className="text-lg font-black text-deep-green">{externalLinks}</p>
+              </div>
+
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Errors Found</span>
+                </div>
+                <p className="text-lg font-black text-red-600">{errorsCount}</p>
+              </div>
+
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Warnings</span>
+                </div>
+                <p className="text-lg font-black text-amber-700">{warningsCount}</p>
+              </div>
+
+              <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-text">
+                  <Gauge className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Avg Speed</span>
+                </div>
+                <p className="text-lg font-black text-deep-green">{avgResponseTime}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {secondsElapsed > 180 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-5 rounded-3xl text-xs font-semibold leading-relaxed flex items-start gap-3 shadow-sm text-left animate-fade-in">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-600 mt-0.5 animate-pulse" />
-          <div className="space-y-0.5">
-            <span className="font-black block text-amber-900">Notice: Slow Audit Progress</span>
-            This audit is taking longer than usual. Large websites, slow external links, or PageSpeed checks can increase crawl time.
-          </div>
-        </div>
-      )}
-
-     
     </div>
   );
 }

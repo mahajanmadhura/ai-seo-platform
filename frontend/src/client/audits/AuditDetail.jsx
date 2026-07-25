@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
-import { getAuditDetail, getAuditPages, getAuditIssues, getAuditStatus } from '../../services/audits';
+import { getAuditDetail, getAuditPages, getAuditIssues, getAuditStatus, getAudits } from '../../services/audits';
 import { getAIRecommendation, generateAIRecommendation } from '../../services/aiRecommendations';
+import { generateReport } from '../../services/reports';
 import {
   ArrowLeft,
   Calendar,
@@ -18,7 +19,9 @@ import {
   ArrowRight,
   RefreshCw,
   Search,
-  ExternalLink
+  ExternalLink,
+  FileText,
+  Clock
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getAuditProcessStatus } from '../../services/processStatus';
@@ -35,7 +38,9 @@ export default function AuditDetail() {
   const [pages, setPages] = useState([]);
   const [issues, setIssues] = useState([]);
   const [recommendation, setRecommendation] = useState(null);
+  const [previousAudit, setPreviousAudit] = useState(null);
 
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -43,7 +48,45 @@ export default function AuditDetail() {
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
 
+  const handleGenerateReportClick = async () => {
+    setGeneratingReport(true);
+    try {
+      const res = await generateReport(id);
+      if (res.success) {
+        addToast('Report generated successfully!', 'success');
+        navigate(`/reports/detail/${id}`);
+      } else {
+        addToast(res.message || 'Failed to generate report.', 'error');
+      }
+    } catch (err) {
+      addToast('An error occurred generating report.', 'error');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const pollIntervalRef = useRef(null);
+
+  const formatDuration = (auditObj) => {
+    if (!auditObj?.started_at) return '00:00:00';
+    
+    let totalSeconds = 0;
+    if (auditObj.completed_at) {
+      const start = new Date(auditObj.started_at).getTime();
+      const end = new Date(auditObj.completed_at).getTime();
+      totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+    } else {
+      const start = new Date(auditObj.started_at).getTime();
+      const now = Date.now();
+      totalSeconds = Math.max(0, Math.floor((now - start) / 1000));
+    }
+
+    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const s = String(totalSeconds % 60).padStart(2, '0');
+
+    return `${h}:${m}:${s}`;
+  };
 
   const renderActionItems = (text) => {
     if (!text) return null;
@@ -79,6 +122,20 @@ export default function AuditDetail() {
       const detailRes = await getAuditDetail(id);
       if (detailRes.success && detailRes.data) {
         setAudit(detailRes.data);
+        
+        // Fetch previous audits for the same website domain to calculate score comparison
+        try {
+          const allAuditsRes = await getAudits();
+          if (allAuditsRes.success && allAuditsRes.data) {
+            const prev = allAuditsRes.data
+              .filter(a => a.website_domain === detailRes.data.website_domain && String(a.id) !== String(id) && a.status === 'DONE')
+              .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))[0];
+            if (prev) {
+              setPreviousAudit(prev);
+            }
+          }
+        } catch (_) {}
+
         if (detailRes.data.status === 'DONE') {
           const [pagesRes, issuesRes, recRes] = await Promise.all([
             getAuditPages(id),
@@ -257,9 +314,29 @@ export default function AuditDetail() {
             <div className="flex items-center gap-4 text-[11px] text-muted-text font-semibold pl-7">
               <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Created: {new Date(audit.started_at).toLocaleString()}</span>
               <span>•</span>
-              <span className="text-forest-green font-bold">5 credits used for this audit</span>
+              <span className="flex items-center gap-1 text-deep-green font-bold">
+                <Clock className="w-3.5 h-3.5 text-forest-green" /> Crawl Duration: {formatDuration(audit)}
+              </span>
             </div>
           </div>
+
+          {audit.status === 'DONE' && (
+            <button
+              onClick={handleGenerateReportClick}
+              disabled={generatingReport}
+              className="bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {generatingReport ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Generating Report...
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" /> Generate Report
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {(audit.status === 'PENDING' || audit.status === 'RUNNING') && (
@@ -287,16 +364,30 @@ export default function AuditDetail() {
         {audit.status === 'DONE' && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between">
-                <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Overall Score</span>
-                <div className="flex items-baseline gap-1 mt-2">
+              <div className="bg-white rounded-2xl p-5 border border-border-color/60 shadow-sm flex flex-col justify-between space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-black uppercase text-muted-text tracking-wider">Overall Score</span>
+                  {previousAudit && audit.overall_score !== null && previousAudit.overall_score !== null && (
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                      audit.overall_score >= previousAudit.overall_score
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {audit.overall_score >= previousAudit.overall_score
+                        ? `↑ +${audit.overall_score - previousAudit.overall_score} since previous audit`
+                        : `↓ ${audit.overall_score - previousAudit.overall_score} since previous audit`
+                      }
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-1 mt-1">
                   <span className="text-3xl font-black text-deep-green">
-                    {audit.overall_score !== null && audit.overall_score !== undefined ? audit.overall_score : 'Not Available'}
+                    {audit.overall_score !== null && audit.overall_score !== undefined ? audit.overall_score : 'N/A'}
                   </span>
                   <span className="text-xs text-muted-text font-bold">/100</span>
                 </div>
-                <div className="w-full bg-mint-surface h-1 rounded-full overflow-hidden mt-3">
-                  <div className="bg-growth-green h-full rounded-full" style={{ width: `${audit.overall_score || 0}%` }} />
+                <div className="w-full bg-mint-surface h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-[#36E682] h-full rounded-full" style={{ width: `${audit.overall_score || 0}%` }} />
                 </div>
               </div>
 

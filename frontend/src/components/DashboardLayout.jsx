@@ -56,7 +56,7 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, enabled: true },
     { name: 'Websites', path: '/websites', icon: Globe, enabled: true },
     { name: 'Audits', path: '/audits', icon: Search, enabled: true },
-    { name: 'Reports', path: '#', icon: FileText, enabled: false, badge: 'Soon' },
+    { name: 'Reports', path: '/reports', icon: FileText, enabled: true },
   ];
 
   const getInitials = () => {

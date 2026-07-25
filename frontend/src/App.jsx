@@ -18,6 +18,9 @@ import AddWebsite from './client/websites/AddWebsite';
 import WebsiteDetail from './client/websites/WebsiteDetail';
 import AuditList from './client/audits/AuditList';
 import AuditDetail from './client/audits/AuditDetail';
+import Reports from './client/reports/Reports';
+import WebsiteReportHistory from './client/reports/WebsiteReportHistory';
+import ReportDetail from './client/reports/ReportDetail';
 import Transactions from './client/billing/Transactions';
 import AdminDashboard from './admin/AdminDashboard';
 
@@ -154,6 +157,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuditDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/history/*"
+              element={
+                <ProtectedRoute>
+                  <WebsiteReportHistory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/detail/:auditId"
+              element={
+                <ProtectedRoute>
+                  <ReportDetail />
                 </ProtectedRoute>
               }
             />

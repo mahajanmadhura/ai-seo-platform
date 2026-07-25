@@ -1,15 +1,17 @@
+from pathlib import Path
+from datetime import timedelta
+from decouple import config
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load .env file
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(dotenv_path=BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
 
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = True
+
 ALLOWED_HOSTS = ['*']
 
 
@@ -42,6 +44,7 @@ INSTALLED_APPS = [
     'audit_results',
     'ai_recommendations',
     'process_status',
+    'reports',
 ]
 
 MIDDLEWARE = [
@@ -74,7 +77,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
-
 ASGI_APPLICATION = 'config.asgi.application'
 
 import socket
@@ -91,8 +93,9 @@ DB_USER = os.getenv('DB_USER', 'seo_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'seo_pass')
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '5432')
+USE_SQLITE = os.getenv('USE_SQLITE', 'True').lower() in ('true', '1', 'yes')
 
-if check_postgres_connection(DB_HOST, DB_PORT):
+if not USE_SQLITE and check_postgres_connection(DB_HOST, DB_PORT):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -135,8 +138,6 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 
 # Where Celery should store the results of the tasks once they are done
 CELERY_RESULT_BACKEND = 'django-db'
-
-# Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

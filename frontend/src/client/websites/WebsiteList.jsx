@@ -42,12 +42,20 @@ export default function WebsiteList() {
       setLoading(true);
       setError('');
       const res = await getAllWebsites();
-      if (res?.success && res?.data) {
+      if (res?.success && Array.isArray(res?.data)) {
         setWebsites(res.data);
+      } else if (Array.isArray(res?.data)) {
+        setWebsites(res.data);
+      } else if (Array.isArray(res)) {
+        setWebsites(res);
       } else {
-        setError(res?.message || 'Failed to fetch websites.');
+        setWebsites([]);
+        if (res?.message) {
+          setError(res.message);
+        }
       }
     } catch (err) {
+      setWebsites([]);
       setError(err.response?.data?.message || 'Error loading websites.');
     } finally {
       setLoading(false);
@@ -67,15 +75,18 @@ export default function WebsiteList() {
   };
 
   const getWebsiteStatus = (item) => {
+    if (!item) return 'Pending';
     if (item.is_verified) return 'Verified';
     const failures = getFailures();
-    if (failures[item.id]) return 'Failed';
+    if (item.id && failures[item.id]) return 'Failed';
     return 'Pending';
   };
 
-  const filteredWebsites = websites.filter((item) => {
+  const filteredWebsites = (websites || []).filter((item) => {
+    if (!item) return false;
     const status = getWebsiteStatus(item);
-    const matchesSearch = item.domain.toLowerCase().includes(search.toLowerCase());
+    const domainStr = (item.domain || item.url) ? String(item.domain || item.url) : '';
+    const matchesSearch = domainStr.toLowerCase().includes((search || '').toLowerCase());
 
     if (activeFilter === 'All') return matchesSearch;
     return matchesSearch && status === activeFilter;
@@ -97,7 +108,7 @@ export default function WebsiteList() {
       delete failures[selectedWebsite.id];
       localStorage.setItem('athenura_verification_failures', JSON.stringify(failures));
 
-      setWebsites((prev) => prev.filter((w) => w.id !== selectedWebsite.id));
+      setWebsites((prev) => prev.filter((w) => w?.id !== selectedWebsite.id));
       setShowDeleteModal(false);
       setSelectedWebsite(null);
     } catch (err) {
@@ -108,7 +119,7 @@ export default function WebsiteList() {
   const handleEditTrigger = (item, e) => {
     e.stopPropagation();
     setSelectedWebsite(item);
-    setEditDomain(item.domain);
+    setEditDomain(item?.domain || '');
     setEditError('');
     setShowEditModal(true);
   };
@@ -117,8 +128,13 @@ export default function WebsiteList() {
     e.preventDefault();
     setEditError('');
 
+    let domainToSubmit = editDomain.trim();
+    if (!domainToSubmit.startsWith('http://') && !domainToSubmit.startsWith('https://')) {
+      domainToSubmit = 'https://' + domainToSubmit;
+    }
+
     try {
-      const parsed = new URL(editDomain);
+      const parsed = new URL(domainToSubmit);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         setEditError('URL must use http:// or https://');
         return;
@@ -130,10 +146,10 @@ export default function WebsiteList() {
 
     setEditLoading(true);
     try {
-      const res = await updateWebsite(selectedWebsite.id, editDomain.trim());
+      const res = await updateWebsite(selectedWebsite.id, domainToSubmit);
       if (res?.success && res?.data) {
         setWebsites((prev) =>
-          prev.map((w) => (w.id === selectedWebsite.id ? res.data : w))
+          prev.map((w) => (w?.id === selectedWebsite.id ? res.data : w))
         );
         setShowEditModal(false);
         setSelectedWebsite(null);
@@ -148,17 +164,35 @@ export default function WebsiteList() {
     }
   };
 
+  const openExternalDomain = (e, domain) => {
+    e.stopPropagation();
+    if (!domain) return;
+    const url = domain.startsWith('http://') || domain.startsWith('https://')
+      ? domain
+      : `https://${domain}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <DashboardLayout
       title="Websites"
       cta={{ text: 'Add Website', link: '?add=true', icon: Plus }}
     >
       <div className="space-y-6 text-left">
-        <div>
-          <h2 className="text-xl md:text-2xl font-black text-deep-green tracking-tight font-sans">Websites</h2>
-          <p className="text-xs text-muted-text mt-1 font-semibold leading-relaxed max-w-2xl">
-            Manage registered domains and verify ownership before running audits.
-          </p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-deep-green tracking-tight font-sans">Websites</h2>
+            <p className="text-xs text-muted-text mt-1 font-semibold leading-relaxed max-w-2xl">
+              Manage registered domains, verify ownership, and run SEO audits.
+            </p>
+          </div>
+
+          <Link
+            to="?add=true"
+            className="bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Website
+          </Link>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-white p-4 rounded-2xl border border-border-color/60 shadow-sm">
@@ -266,12 +300,9 @@ export default function WebsiteList() {
                     </div>
                     <div className="min-w-0 text-left">
                       <h3 className="font-black text-deep-green text-sm truncate flex items-center gap-1.5">
-                        {item.domain}
+                        {item.domain || item.url || 'Unnamed Website'}
                         <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(item.domain, '_blank', 'noopener,noreferrer');
-                          }}
+                          onClick={(e) => openExternalDomain(e, item.domain || item.url)}
                           className="text-muted-text hover:text-[#36E682] transition-colors"
                         >
                           <ExternalLink className="w-3 h-3 cursor-pointer" />
@@ -316,21 +347,12 @@ export default function WebsiteList() {
                     className="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 border-border-color/40 pt-3 md:pt-0 md:w-1/5 animate-fade-in"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {item.is_verified ? (
-                      <button
-                        onClick={() => navigate(`/websites/${item.id}`)}
-                        className="bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-sm uppercase tracking-wider"
-                      >
-                        Start SEO Audit
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => navigate(`/websites/${item.id}`)}
-                        className="bg-deep-green/5 hover:bg-deep-green/10 text-deep-green px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer border border-deep-green/20 uppercase tracking-wider"
-                      >
-                        Verify & Audit
-                      </button>
-                    )}
+                    <button
+                      onClick={() => navigate(`/websites/${item.id}`)}
+                      className="bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-sm uppercase tracking-wider flex items-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" /> Manage Website
+                    </button>
 
                     <div className="flex items-center gap-1.5">
                       <button

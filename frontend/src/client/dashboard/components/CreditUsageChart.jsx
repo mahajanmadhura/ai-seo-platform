@@ -60,23 +60,28 @@ export default function CreditUsageChart() {
     ? daysData.findIndex((d) => d.amount === maxAmt)
     : -1;
 
-  const getBarColor = (day) => {
+  const getBarStyle = (day) => {
     if (day.amount > 0) {
       const maxCapacity = Math.max(maxAmt, 25);
-      const ratio = day.amount / maxCapacity;
-      if (ratio <= 0.35) return 'bg-[#36E682] border-[#36E682]';
-      if (ratio <= 0.7) return 'bg-[#0B5A4A] border-[#0B5A4A]';
-      return 'bg-[#053D34] border-[#053D34]';
-    }
-    return 'striped';
-  };
+      const ratio = Math.min(1, Math.max(0.05, day.amount / maxCapacity));
+      const heightPercent = ratio * 75 + 15;
+      
+      // Dynamic continuous solid color from very light green (82% lightness) to darkest deep green (13% lightness)
+      const hue = 145 + ratio * 23;
+      const saturation = 70 + ratio * 15;
+      const lightness = 82 - ratio * 69;
 
-  const getBarHeight = (day) => {
-    if (day.amount > 0) {
-      const maxCapacity = Math.max(maxAmt, 25);
-      return (day.amount / maxCapacity) * 75 + 15;
+      return {
+        height: `${heightPercent}%`,
+        backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        borderColor: `hsl(${hue}, ${saturation}%, ${Math.max(10, lightness - 10)}%)`,
+        isUsed: true
+      };
     }
-    return day.defaultHeight;
+    return {
+      height: `${day.defaultHeight}%`,
+      isUsed: false
+    };
   };
 
   return (
@@ -106,15 +111,14 @@ export default function CreditUsageChart() {
             <div className="md:col-span-7 flex flex-col justify-between border-r border-[#053D34]/10 pr-3 min-h-[140px]">
               <div className="flex items-end justify-between h-[126px] gap-1.5 px-0.5 pb-1 relative pt-7">
                 {daysData.map((day, idx) => {
-                  const barColor = getBarColor(day);
-                  const barHeight = getBarHeight(day);
+                  const barStyle = getBarStyle(day);
 
                   return (
                     <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full relative group">
 
                       {/* Interactive pointer tooltip on hover */}
                       <div
-                        style={{ bottom: `calc(${barHeight}% + 4px)` }}
+                        style={{ bottom: `calc(${barStyle.height} + 4px)` }}
                         className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <div className="bg-[#E5F3EC] border border-[#36E682]/40 text-[#0B5A4A] text-[7.5px] font-black px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap leading-none">
@@ -124,20 +128,24 @@ export default function CreditUsageChart() {
                         <div className="w-1.5 h-1.5 rounded-full bg-[#36E682] border border-white -mt-0.5 shadow-sm"></div>
                       </div>
 
-                      {/* Rounded Bar Pill */}
-                      {barColor === 'striped' ? (
+                      {/* Rounded Bar Pill with 400ms synchronized height & color transition */}
+                      {!barStyle.isUsed ? (
                         <div
                           style={{
-                            height: `${barHeight}%`,
+                            height: barStyle.height,
                             background: 'repeating-linear-gradient(135deg, #F4FAF7, #F4FAF7 4px, #CBE0D5 4px, #CBE0D5 8px)'
                           }}
-                          className="w-5 rounded-full border border-[#CBE0D5]/50 transition-all cursor-default"
-                        ></div>
+                          className="w-5 rounded-full border border-[#CBE0D5]/50 transition-all duration-500 ease-out cursor-default"
+                        />
                       ) : (
                         <div
-                          style={{ height: `${barHeight}%` }}
-                          className={`w-5 rounded-full transition-all hover:opacity-90 cursor-pointer border ${barColor}`}
-                        ></div>
+                          style={{
+                            height: barStyle.height,
+                            backgroundColor: barStyle.backgroundColor,
+                            borderColor: barStyle.borderColor
+                          }}
+                          className="w-5 rounded-full border transition-all duration-500 ease-out hover:opacity-90 cursor-pointer shadow-xs"
+                        />
                       )}
 
                       <span className="text-[7.5px] text-brand-secondary font-black block mt-1.5 leading-none">
