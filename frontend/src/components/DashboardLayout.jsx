@@ -20,6 +20,7 @@ import {
 import LogoWhite from '../assets/White.png';
 import AddWebsiteModal from '../client/websites/components/AddWebsiteModal';
 import DashboardFooter from './DashboardFooter';
+import PageTransition from './motion/PageTransition';
 
 export default function DashboardLayout({ children, title, cta, backLink }) {
   const { user, logoutUser, credits, refreshCredits } = useAuth();
@@ -219,10 +220,9 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
         )}
 
         <main className="p-6 md:p-8 space-y-8 flex-grow">
-          <div className="sm:hidden mb-2">
-
-          </div>
-          {children}
+          <PageTransition>
+            {children}
+          </PageTransition>
         </main>
         <DashboardFooter />
       </div>

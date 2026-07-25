@@ -70,3 +70,4 @@ def start_audit(request):
     except Exception as e:
         return Response({"error": f"Failed to schedule audit: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    return Response({"audit_id": new_audit.id})

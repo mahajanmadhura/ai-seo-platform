@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { createWebsite } from '../../../services/websites';
 import { Globe, X, Loader2 } from 'lucide-react';
+import ModalMotion from '../../../components/motion/ModalMotion';
 
 export default function AddWebsiteModal({ isOpen, onClose }) {
   const [domain, setDomain] = useState('');
@@ -57,11 +58,9 @@ export default function AddWebsiteModal({ isOpen, onClose }) {
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#053D34]/40 backdrop-blur-md animate-fade-in">
-      <div className="bg-white rounded-[32px] border border-border-color/60 p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-left animate-scale-up">
+    <ModalMotion isOpen={isOpen} onClose={onClose} className="max-w-md">
+      <div className="bg-white rounded-[32px] border border-border-color/60 p-6 sm:p-8 shadow-2xl relative text-left">
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-1.5 hover:bg-soft-bg rounded-lg text-muted-text hover:text-deep-green transition-colors cursor-pointer"
@@ -129,6 +128,6 @@ export default function AddWebsiteModal({ isOpen, onClose }) {
           </form>
         </div>
       </div>
-    </div>
+    </ModalMotion>
   );
 }

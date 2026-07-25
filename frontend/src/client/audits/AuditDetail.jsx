@@ -27,6 +27,7 @@ import { useToast } from '../../context/ToastContext';
 import { getAuditProcessStatus } from '../../services/processStatus';
 import AuditRunningState from './components/AuditRunningState';
 import AIConsultingInsights from './components/AIConsultingInsights';
+import ModalMotion from '../../components/motion/ModalMotion';
 
 export default function AuditDetail() {
   const { id } = useParams();
@@ -47,14 +48,17 @@ export default function AuditDetail() {
   const [issueFilter, setIssueFilter] = useState('all');
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showReportSuccessModal, setShowReportSuccessModal] = useState(false);
+  const [reportExists, setReportExists] = useState(false);
 
   const handleGenerateReportClick = async () => {
     setGeneratingReport(true);
     try {
       const res = await generateReport(id);
       if (res.success) {
-        addToast('Report generated successfully!', 'success');
-        navigate(`/reports/detail/${id}`);
+        setReportExists(true);
+        addToast('Report compiled successfully!', 'success');
+        setShowReportSuccessModal(true);
       } else {
         addToast(res.message || 'Failed to generate report.', 'error');
       }
@@ -321,21 +325,41 @@ export default function AuditDetail() {
           </div>
 
           {audit.status === 'DONE' && (
-            <button
-              onClick={handleGenerateReportClick}
-              disabled={generatingReport}
-              className="bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {generatingReport ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Generating Report...
-                </>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border ${
+                reportExists || audit.pdf_file
+                  ? 'bg-[#36E682]/10 text-[#053D34] border-[#36E682]/30'
+                  : 'bg-amber-500/10 text-amber-800 border-amber-500/20'
+              }`}>
+                <FileText className="w-3.5 h-3.5 text-deep-green" />
+                {reportExists || audit.pdf_file ? 'Report: Ready' : 'Report: Not Generated'}
+              </span>
+
+              {reportExists || audit.pdf_file ? (
+                <button
+                  onClick={() => navigate(`/reports/detail/${id}`)}
+                  className="bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" /> View Report Workspace
+                </button>
               ) : (
-                <>
-                  <FileText className="w-4 h-4" /> Generate Report
-                </>
+                <button
+                  onClick={handleGenerateReportClick}
+                  disabled={generatingReport}
+                  className="bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {generatingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Generating Report...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4" /> Generate Report
+                    </>
+                  )}
+                </button>
               )}
-            </button>
+            </div>
           )}
         </div>
 
@@ -876,6 +900,38 @@ export default function AuditDetail() {
           </>
         )}
       </div>
+      <ModalMotion isOpen={showReportSuccessModal} onClose={() => setShowReportSuccessModal(false)} className="max-w-md">
+        <div className="bg-white rounded-3xl border border-border-color p-7 shadow-2xl space-y-5 text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#E5F3EC] border border-[#36E682]/40 text-deep-green flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-forest-green" />
+            </div>
+            <div>
+              <h3 className="font-black text-deep-green text-base">Report Compiled Successfully</h3>
+              <p className="text-xs text-muted-text mt-0.5 font-semibold">Your report deliverable is ready for export.</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-text leading-relaxed font-semibold">
+            Select your next step. You can open the Report Workspace to download PDF/CSV or share, or stay on this page to continue reviewing audit diagnostics.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={() => navigate(`/reports/detail/${id}`)}
+              className="flex-grow bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md text-center flex items-center justify-center gap-1.5"
+            >
+              <FileText className="w-4 h-4" /> View Report
+            </button>
+            <button
+              onClick={() => setShowReportSuccessModal(false)}
+              className="flex-grow bg-deep-green/5 hover:bg-deep-green/10 text-deep-green border border-deep-green/10 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer text-center"
+            >
+              Continue Reviewing Audit
+            </button>
+          </div>
+        </div>
+      </ModalMotion>
     </DashboardLayout>
   );
 }

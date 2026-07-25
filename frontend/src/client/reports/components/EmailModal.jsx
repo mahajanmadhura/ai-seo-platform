@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Mail, X, Loader2, Send } from 'lucide-react';
+import ModalMotion from '../../../components/motion/ModalMotion';
 
 export default function EmailModal({ isOpen, onClose, onSendEmail, loading }) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-
-  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -34,15 +33,8 @@ export default function EmailModal({ isOpen, onClose, onSendEmail, loading }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-[#053D34]/40 backdrop-blur-sm transition-opacity"
-        onClick={handleClose}
-      />
-
-      {/* Modal Container */}
-      <div className="relative w-full max-w-md bg-white rounded-3xl border border-border-color/60 shadow-2xl p-6 sm:p-8 z-10 space-y-6 animate-scale-up">
+    <ModalMotion isOpen={isOpen} onClose={handleClose} className="max-w-md">
+      <div className="relative w-full bg-white rounded-3xl border border-border-color/60 shadow-2xl p-6 sm:p-8 space-y-6 text-left">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -114,6 +106,6 @@ export default function EmailModal({ isOpen, onClose, onSendEmail, loading }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalMotion>
   );
 }

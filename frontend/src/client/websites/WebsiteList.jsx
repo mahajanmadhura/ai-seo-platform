@@ -18,6 +18,7 @@ import {
   Key
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
+import ModalMotion from '../../components/motion/ModalMotion';
 
 export default function WebsiteList() {
   const navigate = useNavigate();
@@ -294,23 +295,26 @@ export default function WebsiteList() {
                     idx % 2 === 0 ? 'bg-white' : 'bg-[#E5F3EC]/35'
                   }`}
                 >
-                  <div className="flex items-center gap-4 min-w-0 md:w-2/5">
+                  <div className="flex items-center gap-3.5 min-w-0 md:w-2/5 flex-grow">
                     <div className="p-2.5 bg-[#E5F3EC] rounded-xl text-deep-green border border-border-color/20 flex-shrink-0">
                       <Globe className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0 text-left">
-                      <h3 className="font-black text-deep-green text-sm truncate flex items-center gap-1.5">
-                        {item.domain || item.url || 'Unnamed Website'}
-                        <span
+                    <div className="min-w-0 text-left flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-black text-deep-green text-sm truncate min-w-0 flex-1">
+                          {item.domain || item.url || 'Unnamed Website'}
+                        </h3>
+                        <button
+                          type="button"
                           onClick={(e) => openExternalDomain(e, item.domain || item.url)}
-                          className="text-muted-text hover:text-[#36E682] transition-colors"
+                          className="text-muted-text hover:text-[#36E682] transition-colors flex-shrink-0 p-1"
                         >
                           <ExternalLink className="w-3 h-3 cursor-pointer" />
-                        </span>
-                      </h3>
-                      <div className="flex items-center gap-1.5 text-[9px] text-muted-text font-semibold mt-0.5">
-                        <Key className="w-3 h-3 text-muted-text/75" />
-                        <span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] text-muted-text font-semibold mt-0.5 truncate">
+                        <Key className="w-3 h-3 text-muted-text/75 flex-shrink-0" />
+                        <span className="truncate">
                           Token: <span className="font-mono text-deep-green/80">Available</span>
                         </span>
                       </div>
@@ -378,33 +382,106 @@ export default function WebsiteList() {
         )}
       </div>
 
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#053D34]/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl border border-border-color p-6 max-w-md w-full shadow-2xl space-y-5 text-left animate-slide-down">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-black text-deep-green text-base">Delete Website</h3>
-                <p className="text-xs text-muted-text mt-0.5 font-semibold">This action is irreversible.</p>
+      {/* Delete Website Modal */}
+      <ModalMotion
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedWebsite(null);
+        }}
+        className="max-w-md"
+      >
+        <div className="bg-white rounded-3xl border border-border-color p-6 shadow-2xl space-y-5 text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-black text-deep-green text-base">Delete Website</h3>
+              <p className="text-xs text-muted-text mt-0.5 font-semibold">This action is irreversible.</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-text leading-relaxed font-semibold">
+            Are you sure you want to delete <strong className="text-deep-green">{selectedWebsite?.domain}</strong>? All configurations and ownership mappings will be permanently removed.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleDeleteConfirm}
+              className="flex-grow bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
+            >
+              Yes, Delete Website
+            </button>
+            <button
+              onClick={() => {
+                setShowDeleteModal(false);
+                setSelectedWebsite(null);
+              }}
+              className="flex-grow bg-deep-green/5 hover:bg-deep-green/10 text-deep-green border border-deep-green/10 py-3 rounded-xl text-xs font-black transition-all cursor-pointer text-center"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </ModalMotion>
+
+      {/* Edit Website Modal */}
+      <ModalMotion
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedWebsite(null);
+        }}
+        className="max-w-md"
+      >
+        <div className="bg-white rounded-3xl border border-border-color p-6 shadow-2xl space-y-5 text-left">
+          <div>
+            <h3 className="font-black text-deep-green text-base">Edit Website Details</h3>
+            <p className="text-xs text-muted-text mt-0.5 font-semibold">Update the domain name configuration.</p>
+          </div>
+
+          {editError && (
+            <div className="bg-red-500/5 border border-red-500/15 text-red-700 p-3.5 rounded-xl text-xs font-bold text-center">
+              {editError}
+            </div>
+          )}
+
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-deep-green uppercase tracking-widest pl-1 font-sans">
+                Website URL
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" />
+                <input
+                  type="text"
+                  required
+                  value={editDomain}
+                  onChange={(e) => setEditDomain(e.target.value)}
+                  className="auth-input auth-input-icon text-xs font-medium"
+                />
               </div>
             </div>
 
-            <p className="text-xs text-muted-text leading-relaxed font-semibold">
-              Are you sure you want to delete <strong className="text-deep-green">{selectedWebsite?.domain}</strong>? All configurations and ownership mappings will be permanently removed.
-            </p>
-
             <div className="flex gap-3 pt-2">
               <button
-                onClick={handleDeleteConfirm}
-                className="flex-grow bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
+                type="submit"
+                disabled={editLoading}
+                className="flex-grow bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
-                Yes, Delete Website
+                {editLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
               </button>
               <button
+                type="button"
                 onClick={() => {
-                  setShowDeleteModal(false);
+                  setShowEditModal(false);
                   setSelectedWebsite(null);
                 }}
                 className="flex-grow bg-deep-green/5 hover:bg-deep-green/10 text-deep-green border border-deep-green/10 py-3 rounded-xl text-xs font-black transition-all cursor-pointer text-center"
@@ -412,70 +489,9 @@ export default function WebsiteList() {
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         </div>
-      )}
-
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#053D34]/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl border border-border-color p-6 max-w-md w-full shadow-2xl space-y-5 text-left animate-slide-down">
-            <div>
-              <h3 className="font-black text-deep-green text-base">Edit Website Details</h3>
-              <p className="text-xs text-muted-text mt-0.5 font-semibold">Update the domain name configuration.</p>
-            </div>
-
-            {editError && (
-              <div className="bg-red-500/5 border border-red-500/15 text-red-700 p-3.5 rounded-xl text-xs font-bold text-center">
-                {editError}
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-deep-green uppercase tracking-widest pl-1 font-sans">
-                  Website URL
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" />
-                  <input
-                    type="text"
-                    required
-                    value={editDomain}
-                    onChange={(e) => setEditDomain(e.target.value)}
-                    className="auth-input auth-input-icon text-xs font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={editLoading}
-                  className="flex-grow bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                >
-                  {editLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedWebsite(null);
-                  }}
-                  className="flex-grow bg-deep-green/5 hover:bg-deep-green/10 text-deep-green border border-deep-green/10 py-3 rounded-xl text-xs font-black transition-all cursor-pointer text-center"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </ModalMotion>
     </DashboardLayout>
   );
 }

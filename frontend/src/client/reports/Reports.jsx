@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { getAudits } from '../../services/audits';
-import ReportCard from './components/ReportCard';
 import WhiteLabelSettings from './components/WhiteLabelSettings';
 import {
   FileText,
@@ -12,7 +11,9 @@ import {
   ArrowRight,
   Globe,
   History,
-  Eye
+  Calendar,
+  Layers,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function Reports() {
@@ -23,16 +24,6 @@ export default function Reports() {
   const [audits, setAudits] = useState([]);
   const [loadingAudits, setLoadingAudits] = useState(true);
   const [auditError, setAuditError] = useState('');
-  const [selectedAuditId, setSelectedAuditId] = useState(null);
-
-  useEffect(() => {
-    // Check if audit_id parameter is passed in URL (e.g. /reports?audit_id=9)
-    const params = new URLSearchParams(location.search);
-    const paramAuditId = params.get('audit_id');
-    if (paramAuditId) {
-      setSelectedAuditId(Number(paramAuditId));
-    }
-  }, [location.search]);
 
   useEffect(() => {
     fetchAudits();
@@ -46,22 +37,17 @@ export default function Reports() {
     if (res.success && res.data) {
       setAudits(res.data || []);
     } else {
-      setAuditError(res.message || 'Failed to load audits.');
+      setAuditError(res.message || 'Failed to load reports library.');
     }
 
     setLoadingAudits(false);
   };
 
-  const handleDeleteCard = (auditId) => {
-    setAudits((prev) => prev.filter((a) => a.id !== auditId));
-  };
-
-  // Group completed audits by website: ONLY ONE CARD PER WEBSITE (shows latest report)
+  // Group all audits by website domain to display Project Summary Cards
   const websiteGroups = useMemo(() => {
-    const completed = audits.filter((a) => a.status === 'DONE');
     const groups = {};
 
-    completed.forEach((audit) => {
+    audits.forEach((audit) => {
       const domain = audit.website_domain || 'Uncategorized';
       if (!groups[domain]) {
         groups[domain] = [];
@@ -69,32 +55,40 @@ export default function Reports() {
       groups[domain].push(audit);
     });
 
-    // Sort each domain's audits newest first
-    Object.keys(groups).forEach((domain) => {
-      groups[domain].sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
-    });
+    return Object.entries(groups).map(([domain, websiteAudits]) => {
+      // Sort newest first
+      websiteAudits.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+      const completedAudits = websiteAudits.filter((a) => a.status === 'DONE');
+      const reportsCompiled = websiteAudits.filter((a) => a.pdf_file || a.status === 'DONE');
+      const latest = websiteAudits[0];
 
-    return Object.entries(groups).map(([domain, websiteAudits]) => ({
-      domain,
-      latestReport: websiteAudits[0],
-      totalCount: websiteAudits.length
-    }));
+      return {
+        domain,
+        latestAudit: latest,
+        totalAudits: websiteAudits.length,
+        totalReports: reportsCompiled.length,
+        latestScore: latest?.overall_score ?? 'N/A',
+        lastAuditDate: latest?.started_at ? new Date(latest.started_at).toLocaleDateString() : 'N/A',
+        lastReportDate: latest?.completed_at || latest?.started_at ? new Date(latest.completed_at || latest.started_at).toLocaleDateString() : 'N/A',
+        reportStatus: reportsCompiled.length > 0 ? 'Ready' : 'Not Generated'
+      };
+    });
   }, [audits]);
 
   return (
-    <DashboardLayout title="Reports">
-      <div className="space-y-8 max-w-7xl mx-auto">
+    <DashboardLayout title="Report Library">
+      <div className="space-y-8 max-w-7xl mx-auto text-left">
         
         {/* Header & Top Right Tabs Switcher */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border-color/40 pb-4">
           <div>
-            <h1 className="text-2xl font-black text-deep-green tracking-tight">Reports</h1>
+            <h1 className="text-2xl font-black text-deep-green tracking-tight">Report Library</h1>
             <p className="text-xs text-muted-text mt-1 font-semibold">
-              Executive SEO audit reports grouped by website domain.
+              Project summary cards grouped by website domain.
             </p>
           </div>
 
-          {/* Top Right Tabs: Reports & White Label Branding */}
+          {/* Top Right Tabs: Reports Library & White Label Branding Settings */}
           <div className="flex items-center gap-1.5 bg-white border border-border-color/60 p-1.5 rounded-2xl shadow-xs">
             <button
               onClick={() => setActiveTab('reports')}
@@ -104,7 +98,7 @@ export default function Reports() {
                   : 'text-muted-text hover:text-deep-green hover:bg-soft-bg'
               }`}
             >
-              <FileText className="w-4 h-4" /> Reports
+              <FileText className="w-4 h-4" /> Report Vault
             </button>
             <button
               onClick={() => setActiveTab('branding')}
@@ -119,20 +113,20 @@ export default function Reports() {
           </div>
         </div>
 
-        {/* TAB 1: ONE WEBSITE CARD PER DOMAIN */}
+        {/* TAB 1: PROJECT SUMMARY CARDS PER WEBSITE */}
         {activeTab === 'reports' && (
           <div>
             {loadingAudits ? (
               <div className="bg-white rounded-2xl p-12 border border-border-color/60 text-center flex flex-col items-center justify-center min-h-[250px] shadow-xs">
                 <Loader2 className="w-8 h-8 text-deep-green animate-spin" />
-                <p className="text-xs text-muted-text mt-3 font-bold">Loading reports...</p>
+                <p className="text-xs text-muted-text mt-3 font-bold">Loading report library...</p>
               </div>
             ) : auditError ? (
               <div className="bg-white rounded-2xl p-8 border border-border-color/60 text-center max-w-md mx-auto space-y-3 shadow-xs">
                 <div className="w-10 h-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
                   <AlertCircle className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-black text-deep-green">Failed to Load Reports</h3>
+                <h3 className="text-sm font-black text-deep-green">Failed to Load Library</h3>
                 <p className="text-xs text-muted-text font-semibold">{auditError}</p>
                 <button
                   onClick={fetchAudits}
@@ -147,9 +141,9 @@ export default function Reports() {
                   <FileText className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-black text-deep-green">No Reports Generated Yet</h3>
+                  <h3 className="text-base font-black text-deep-green">No Reports or Projects Yet</h3>
                   <p className="text-xs text-muted-text font-semibold leading-relaxed">
-                    Complete an audit and click "Generate Report" on the Audit Results page to view reports here.
+                    Start an audit from the Dashboard or Website Detail page to initialize your project summary vault.
                   </p>
                 </div>
                 <Link
@@ -160,57 +154,74 @@ export default function Reports() {
                 </Link>
               </div>
             ) : (
-              /* One Website Card Per Domain showing Latest Report + View History Button */
+              /* Project Summary Cards Grid */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {websiteGroups.map((group) => (
                   <div
                     key={group.domain}
-                    className="bg-white rounded-3xl border border-border-color/60 p-6 shadow-sm space-y-6 text-left flex flex-col justify-between"
+                    className="bg-white rounded-3xl border border-border-color/60 p-6 shadow-sm space-y-5 text-left flex flex-col justify-between"
                   >
-                    {/* Website Header & View History Action Button */}
-                    <div className="flex items-center justify-between gap-3 border-b border-border-color/40 pb-4">
-                      <div className="flex items-center gap-3">
+                    {/* Website Header */}
+                    {/* Website Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-color/40 pb-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-2xl bg-[#E5F3EC] border border-border-color/40 flex items-center justify-center text-deep-green flex-shrink-0">
                           <Globe className="w-5 h-5" />
                         </div>
-                        <div>
-                          <h3 className="text-base font-black text-deep-green tracking-tight">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm sm:text-base font-black text-deep-green tracking-tight truncate">
                             {group.domain}
                           </h3>
                           <p className="text-xs text-muted-text font-semibold">
-                            {group.totalCount} {group.totalCount === 1 ? 'Report' : 'Reports'} Total
+                            Project Summary
                           </p>
                         </div>
                       </div>
 
-                      {/* View History Button -> Navigates to dedicated History Page */}
+                      {/* Single Action: View History Button */}
                       <Link
                         to={`/reports/history/${encodeURIComponent(group.domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/+$/, ''))}`}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-soft-bg hover:bg-mint-surface/50 text-deep-green border border-border-color/50 transition-all cursor-pointer flex-shrink-0"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-deep-green hover:bg-[#36E682] text-white hover:text-deep-green transition-all shadow-sm cursor-pointer flex-shrink-0"
                       >
-                        <History className="w-4 h-4 text-forest-green" /> View History
+                        <History className="w-4 h-4" /> View History
                       </Link>
                     </div>
 
-                    {/* Latest Report Display */}
-                    <div className="space-y-2 flex-grow flex flex-col justify-between">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-text block">
-                          Latest Generated Report
-                        </span>
-                        <button
-                          onClick={() => navigate(`/reports/detail/${group.latestReport.id}`)}
-                          className="text-[11px] font-bold text-deep-green hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-forest-green" /> View Details
-                        </button>
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Latest Score</span>
+                        <span className="text-base font-black text-deep-green">{group.latestScore}/100</span>
                       </div>
 
-                      <ReportCard
-                        audit={group.latestReport}
-                        isSelected={selectedAuditId === group.latestReport.id}
-                        onDelete={handleDeleteCard}
-                      />
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Total Audits</span>
+                        <span className="text-base font-black text-deep-green">{group.totalAudits}</span>
+                      </div>
+
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Total Reports</span>
+                        <span className="text-base font-black text-deep-green">{group.totalReports}</span>
+                      </div>
+
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Last Audit</span>
+                        <span className="text-xs font-bold text-deep-green">{group.lastAuditDate}</span>
+                      </div>
+
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Last Report</span>
+                        <span className="text-xs font-bold text-deep-green">{group.lastReportDate}</span>
+                      </div>
+
+                      <div className="bg-soft-bg p-3 rounded-2xl border border-border-color/40">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-text block">Report Status</span>
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${
+                          group.reportStatus === 'Ready' ? 'text-emerald-700' : 'text-amber-700'
+                        }`}>
+                          {group.reportStatus}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -1,10 +1,11 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
-import { User, CreditCard, Lock } from 'lucide-react';
+import { User, CreditCard, Lock, Palette } from 'lucide-react';
 import ProfileSettings from './components/ProfileSettings';
 import BillingCredits from '../billing/components/BillingCredits';
 import SecuritySettings from './components/SecuritySettings';
+import WhiteLabelSettings from '../reports/components/WhiteLabelSettings';
 
 export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -12,6 +13,7 @@ export default function Settings() {
 
   const tabs = [
     { id: 'profile', name: 'Profile Settings', icon: User },
+    { id: 'branding', name: 'White Label Branding', icon: Palette },
     { id: 'billing', name: 'Billing & Credits', icon: CreditCard },
     { id: 'security', name: 'Security & Credentials', icon: Lock }
   ];
@@ -22,7 +24,7 @@ export default function Settings() {
         <div>
           <h2 className="text-xl md:text-2xl font-black text-deep-green tracking-tight font-sans">Account Settings</h2>
           <p className="text-xs text-muted-text mt-1 font-semibold max-w-2xl leading-relaxed">
-            Manage your personal profile, buy credit bundles, trace invoices, and update security keys.
+            Manage personal profile information, custom white-label branding, credit balance, and security settings.
           </p>
         </div>
 
@@ -50,6 +52,7 @@ export default function Settings() {
 
           <div className="md:col-span-3 max-h-[calc(100vh-180px)] overflow-y-auto pr-1 custom-scrollbar">
             {activeTab === 'profile' && <ProfileSettings />}
+            {activeTab === 'branding' && <WhiteLabelSettings />}
             {activeTab === 'billing' && <BillingCredits />}
             {activeTab === 'security' && <SecuritySettings />}
           </div>

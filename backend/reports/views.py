@@ -19,12 +19,22 @@ def get_pdf_filename(audit_id, website_url):
     return f"report_{audit_id}_{str(website_url)}".replace('/', '_').replace(':', '') + ".pdf"
 
 
+def get_owned_audit(audit_id, user):
+    """
+    Fetch an Audit but only if it belongs to the requesting user.
+
+    Ownership chain: Audit -> Website (website_id) -> owner_id (User).
+    There is no direct user/created_by/owner field on Audit itself.
+    """
+    return Audit.objects.get(id=audit_id, website__owner=user)
+
+
 class GenerateReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, audit_id):
         try:
-            audit = Audit.objects.get(id=audit_id)
+            audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -45,7 +55,7 @@ class DownloadReportView(APIView):
 
     def get(self, request, audit_id):
         try:
-            audit = Audit.objects.get(id=audit_id)
+            audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -65,7 +75,7 @@ class EmailReportView(APIView):
 
     def post(self, request, audit_id):
         try:
-            audit = Audit.objects.get(id=audit_id)
+            audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -121,29 +131,184 @@ class EmailReportView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _build_report_context(audit, branding=None):
+    """
+    Single source of truth for report data, shared by CSV and JSON exports.
+    Mirrors exactly what generate_pdf_report() calculates, so all three
+    formats (PDF/CSV/JSON) always stay in sync.
+    """
+    from django.utils import timezone
+
+    pages = CrawledPage.objects.filter(audit=audit)
+    issues = SEOIssues.objects.filter(audit=audit)
+    total_pages = pages.count()
+
+    overall_score = getattr(audit, 'overall_Score', getattr(audit, 'overall_score', 0)) or 0
+    performance_score = int(pages.aggregate(avg=Avg('performance_score'))['avg'] or 0)
+    mobile_score = int(pages.filter(is_mobile_friendly=True).count() / max(total_pages, 1) * 100)
+    security_score = int(pages.filter(has_valid_SSL=True).count() / max(total_pages, 1) * 100)
+
+    first_page = pages.first()
+
+    company_name = branding.company_name if branding and branding.is_white_label else 'AI SEO Audit Platform'
+
+    summary = {
+        'website_url': str(audit.website),
+        'audit_id': audit.id,
+        'started_at': str(getattr(audit, 'started_at', getattr(audit, 'created_at', ''))),
+        'report_generated_at': timezone.now().isoformat(),
+        'generated_by': company_name,
+        'overall_seo_score': overall_score,
+        'performance_score': performance_score,
+        'mobile_score_percent': mobile_score,
+        'security_score_percent': security_score,
+        'total_pages_crawled': total_pages,
+        'total_issues': issues.count(),
+        'critical_issues': issues.filter(issue_type='ERROR').count(),
+        'warnings': issues.filter(issue_type='WARNING').count(),
+        'has_sitemap': bool(getattr(audit, 'has_sitemap', False)),
+        'has_robots_txt': bool(getattr(audit, 'has_robots', False)),
+    }
+
+    core_web_vitals = {}
+    mobile_security_checks = {}
+    if first_page:
+        core_web_vitals = {
+            'largest_contentful_paint_s': getattr(first_page, 'largest_contentful_paint', None),
+            'first_input_delay_ms': getattr(first_page, 'first_input_delay', None),
+            'cumulative_layout_shift': getattr(first_page, 'cumulative_layout_shift', None),
+            'first_contentful_paint_s': getattr(first_page, 'first_contentful_paint', None),
+            'time_to_first_byte_s': getattr(first_page, 'time_to_first_byte', None),
+            'avg_word_count': getattr(first_page, 'word_count', None),
+        }
+        mobile_security_checks = {
+            'mobile_responsive': bool(getattr(first_page, 'is_mobile_friendly', False)),
+            'ssl_certificate_valid': bool(getattr(first_page, 'has_valid_SSL', False)),
+            'viewport_configured': bool(getattr(first_page, 'has_mobile_viewport_configuration', False)),
+            'https_hsts_enabled': bool(getattr(first_page, 'has_strict_transport_security', False)),
+            'mobile_font_readability_good': bool(getattr(first_page, 'mobile_font_readability', False)),
+            'content_security_policy_enabled': bool(getattr(first_page, 'has_content_security_policy', False)),
+        }
+
+    ai_recommendation = getattr(audit, 'ai_recommendation', None) or \
+        'AI Recommendations and action items will be updated post full-crawl evaluation.'
+
+    pages_list = []
+    for page in pages:
+        pages_list.append({
+            'url': getattr(page, 'url', ''),
+            'status_code': getattr(page, 'status_code', None),
+            'title': getattr(page, 'title', ''),
+            'h1': getattr(page, 'h1_header', getattr(page, 'h1_models', '')),
+            'word_count': getattr(page, 'word_count', 0),
+            'load_time': getattr(page, 'load_time', 0.0),
+            'on_page_score': getattr(page, 'on_page_score', 0),
+            'technical_score': getattr(page, 'technical_score', 0),
+            'performance_score': getattr(page, 'performance_score', 0),
+        })
+
+    issues_list = []
+    for issue in issues:
+        issues_list.append({
+            'type': getattr(issue, 'issue_type', ''),
+            'description': getattr(issue, 'description', getattr(issue, 'issue_description', '')),
+            'page_url': getattr(issue.crawled_page, 'url', '') if hasattr(issue, 'crawled_page') and issue.crawled_page else None
+        })
+
+    return {
+        'summary': summary,
+        'core_web_vitals': core_web_vitals,
+        'mobile_security_checks': mobile_security_checks,
+        'ai_recommendation': str(ai_recommendation)[:1200],
+        'crawled_pages': pages_list,
+        'seo_issues': issues_list,
+    }
+
+
 class CSVExportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, audit_id):
         try:
-            audit = Audit.objects.get(id=audit_id)
+            audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        total_issues = SEOIssues.objects.filter(audit=audit).count()
-        critical_issues = SEOIssues.objects.filter(audit=audit, issue_type='ERROR').count()
+        branding = BrandingSettings.objects.filter(user=request.user).first()
+        ctx = _build_report_context(audit, branding)
+        s = ctx['summary']
 
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="seo_report_{audit_id}.csv"'
 
         writer = csv.writer(response)
-        writer.writerow(['Field', 'Value'])
-        writer.writerow(['Website URL', str(audit.website)])
-        writer.writerow(['SEO Score', audit.overall_Score or 0])
-        writer.writerow(['Total Issues', total_issues])
-        writer.writerow(['Critical Issues', critical_issues])
-        writer.writerow(['Total Pages', audit.total_pages])
-        writer.writerow(['Generated At', audit.started_at])
+
+        # 1. High-Level Summary Section
+        writer.writerow(['--- AUDIT SUMMARY ---'])
+        writer.writerow(['Website URL', s['website_url']])
+        writer.writerow(['Overall SEO Score', s['overall_seo_score']])
+        writer.writerow(['Performance Score', s['performance_score']])
+        writer.writerow(['Mobile Score (%)', s['mobile_score_percent']])
+        writer.writerow(['Security Score (%)', s['security_score_percent']])
+        writer.writerow(['Total Issues', s['total_issues']])
+        writer.writerow(['Critical Issues', s['critical_issues']])
+        writer.writerow(['Warnings', s['warnings']])
+        writer.writerow(['Total Pages Crawled', s['total_pages_crawled']])
+        writer.writerow(['Started At', s['started_at']])
+        writer.writerow(['Sitemap Found', 'Yes' if s['has_sitemap'] else 'No'])
+        writer.writerow(['Robots.txt Found', 'Yes' if s['has_robots_txt'] else 'No'])
+        writer.writerow(['Report Generated At', s['report_generated_at']])
+        writer.writerow(['Generated By', s['generated_by']])
+        writer.writerow([])
+
+        # 2. Core Web Vitals Section
+        if ctx['core_web_vitals']:
+            cwv = ctx['core_web_vitals']
+            writer.writerow(['--- CORE WEB VITALS (Sample Page) ---'])
+            writer.writerow(['Metric', 'Value'])
+            writer.writerow(['LCP (Largest Contentful Paint)', f"{cwv['largest_contentful_paint_s']}s"])
+            writer.writerow(['FID (First Input Delay)', f"{cwv['first_input_delay_ms']}ms"])
+            writer.writerow(['CLS (Cumulative Layout Shift)', cwv['cumulative_layout_shift']])
+            writer.writerow(['FCP (First Contentful Paint)', f"{cwv['first_contentful_paint_s']}s"])
+            writer.writerow(['TTFB (Time to First Byte)', f"{cwv['time_to_first_byte_s']}s"])
+            writer.writerow(['Avg Word Count', cwv['avg_word_count']])
+            writer.writerow([])
+
+        # 3. Mobile & Security Checks Section
+        if ctx['mobile_security_checks']:
+            msc = ctx['mobile_security_checks']
+            writer.writerow(['--- MOBILE & SECURITY CHECKS ---'])
+            writer.writerow(['Check', 'Status'])
+            writer.writerow(['Mobile Responsive', 'Yes' if msc['mobile_responsive'] else 'No'])
+            writer.writerow(['SSL Certificate Valid', 'Yes' if msc['ssl_certificate_valid'] else 'No'])
+            writer.writerow(['Viewport Configured', 'Yes' if msc['viewport_configured'] else 'No'])
+            writer.writerow(['HTTPS / HSTS Enabled', 'Yes' if msc['https_hsts_enabled'] else 'No'])
+            writer.writerow(['Mobile Font Readability Good', 'Yes' if msc['mobile_font_readability_good'] else 'No'])
+            writer.writerow(['Content Security Policy Enabled', 'Yes' if msc['content_security_policy_enabled'] else 'No'])
+            writer.writerow([])
+
+        # 4. AI Recommendations Section
+        writer.writerow(['--- AI RECOMMENDATIONS ---'])
+        writer.writerow([ctx['ai_recommendation']])
+        writer.writerow([])
+
+        # 5. Detailed Crawled Pages Section
+        writer.writerow(['--- CRAWLED PAGES BREAKDOWN ---'])
+        writer.writerow(['URL', 'Status Code', 'Title', 'H1 Header', 'Word Count', 'Load Time',
+                          'On-Page Score', 'Technical Score', 'Performance Score'])
+        for page in ctx['crawled_pages']:
+            writer.writerow([
+                page['url'], page['status_code'], page['title'], page['h1'],
+                page['word_count'], page['load_time'],
+                page['on_page_score'], page['technical_score'], page['performance_score'],
+            ])
+        writer.writerow([])
+
+        # 6. SEO Issues Section
+        writer.writerow(['--- DETAILED SEO ISSUES ---'])
+        writer.writerow(['Issue Type', 'Description', 'Page URL'])
+        for issue in ctx['seo_issues']:
+            writer.writerow([issue['type'], issue['description'], issue['page_url']])
 
         return response
 
@@ -153,23 +318,14 @@ class JSONExportView(APIView):
 
     def get(self, request, audit_id):
         try:
-            audit = Audit.objects.get(id=audit_id)
+            audit = get_owned_audit(audit_id, request.user)
         except Audit.DoesNotExist:
             return Response({'error': 'Audit not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        total_issues = SEOIssues.objects.filter(audit=audit).count()
-        critical_issues = SEOIssues.objects.filter(audit=audit, issue_type='ERROR').count()
+        branding = BrandingSettings.objects.filter(user=request.user).first()
+        ctx = _build_report_context(audit, branding)
 
-        data = {
-            'website_url': str(audit.website),
-            'seo_score': audit.overall_Score or 0,
-            'total_issues': total_issues,
-            'critical_issues': critical_issues,
-            'total_pages': audit.total_pages,
-            'generated_at': str(audit.started_at),
-        }
-
-        response = HttpResponse(json.dumps(data, indent=2), content_type='application/json')
+        response = HttpResponse(json.dumps(ctx, indent=2, default=str), content_type='application/json')
         response['Content-Disposition'] = f'attachment; filename="seo_report_{audit_id}.json"'
         return response
 

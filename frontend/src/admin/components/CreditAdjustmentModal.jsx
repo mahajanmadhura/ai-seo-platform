@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { adjustUserCredits } from '../../services/admin';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import ModalMotion from '../../components/motion/ModalMotion';
 
 export default function CreditAdjustmentModal({ user, onClose, onUpdateSuccess }) {
   const { addToast } = useToast();
@@ -31,9 +32,8 @@ export default function CreditAdjustmentModal({ user, onClose, onUpdateSuccess }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-sm animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl border border-neutral-100 shadow-2xl max-w-md w-full overflow-hidden flex flex-col text-left">
-        
+    <ModalMotion isOpen={true} onClose={onClose} className="max-w-md">
+      <div className="bg-white rounded-3xl border border-neutral-100 shadow-2xl overflow-hidden flex flex-col text-left font-sans">
         {/* Header */}
         <div className="p-5 border-b border-neutral-100 flex justify-between items-center bg-[#F8FAFC]">
           <div>
@@ -118,6 +118,6 @@ export default function CreditAdjustmentModal({ user, onClose, onUpdateSuccess }
           </div>
         </form>
       </div>
-    </div>
+    </ModalMotion>
   );
 }
