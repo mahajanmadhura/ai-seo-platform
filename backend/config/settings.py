@@ -25,7 +25,8 @@ INSTALLED_APPS = [
     'payments',
     'django_filters',
     'system',
-    
+    'ai_engine',
+    'support',
 
 ]
 
