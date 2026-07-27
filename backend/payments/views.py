@@ -11,7 +11,6 @@ from .serializers import (
     CreditTransactionSerializer,
 )
 
-
 class CreditBalanceView(APIView):
     permission_classes = [IsAuthenticated]
 

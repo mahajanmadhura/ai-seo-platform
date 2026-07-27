@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .admin_views import AdminRoleUpdateView
 
 urlpatterns = [
     path("register/", views.RegisterView.as_view(), name="register"),
@@ -13,4 +14,7 @@ urlpatterns = [
     path("reset-password/<str:token>/", views.ResetPasswordView.as_view(), name="reset-password"),
     path("resend-verification-email/", views.ResendVerificationEmailView.as_view(), name="resend-verification-email"),
     path("profile/update/", views.ProfileUpdateView.as_view(), name="profile-update"),
+    path('admin/roles/<int:user_id>/', AdminRoleUpdateView.as_view(), name='admin-role-update'),
 ]
+
+

@@ -23,6 +23,9 @@ INSTALLED_APPS = [
     'websites',
     'audits',
     'payments',
+    'django_filters',
+    'system',
+    
 
 ]
 
