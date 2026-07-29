@@ -1,9 +1,13 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
-import AdminDashboardView from './components/AdminDashboardView';
-import AdminUsersView from './components/AdminUsersView';
-import AdminAuditLogsView from './components/AdminAuditLogsView';
+import AdminDashboardView from './pages/AdminDashboardView';
+import AdminRevenueView from './pages/AdminRevenueView';
+import AdminUsersView from './pages/AdminUsersView';
+import AdminWebsitesView from './pages/AdminWebsitesView';
+import AdminAuditsView from './pages/AdminAuditsView';
+import AdminAiAnalyticsView from './pages/AdminAiAnalyticsView';
+import AdminSystemHealthView from './pages/AdminSystemHealthView';
 
 export default function AdminDashboard() {
   const location = useLocation();
@@ -13,21 +17,20 @@ export default function AdminDashboard() {
       case '/admin':
       case '/admin/dashboard':
         return <AdminDashboardView />;
+      case '/admin/revenue':
+        return <AdminRevenueView />;
       case '/admin/users':
         return <AdminUsersView />;
-      case '/admin/audit-logs':
-        return <AdminAuditLogsView />;
+      case '/admin/websites':
+        return <AdminWebsitesView />;
+      case '/admin/audits':
+        return <AdminAuditsView />;
+      case '/admin/ai':
+        return <AdminAiAnalyticsView />;
+      case '/admin/system':
+        return <AdminSystemHealthView />;
       default:
-        return (
-          <div className="w-full h-full flex flex-col items-center justify-center p-8 text-neutral-450 border border-neutral-100 rounded-2xl bg-white shadow-sm min-h-[360px] font-sans">
-            <p className="text-xs font-black uppercase tracking-widest text-neutral-400">
-              Page Under Construction
-            </p>
-            <p className="text-[11px] text-neutral-450 font-semibold mt-2 max-w-sm text-center leading-relaxed">
-              This administration portal module is mapped and secured, but is currently under development.
-            </p>
-          </div>
-        );
+        return <AdminDashboardView />;
     }
   };
 

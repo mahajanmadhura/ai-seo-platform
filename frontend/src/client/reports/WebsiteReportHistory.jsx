@@ -53,7 +53,7 @@ export default function WebsiteReportHistory() {
 
   return (
     <DashboardLayout title="Website Report History">
-      <div className="space-y-6 max-w-7xl mx-auto text-left">
+      <div className="space-y-6 max-w-7xl mx-auto text-left font-sans">
         
         {/* Back Navigation & Domain Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border-color/40 pb-4">
@@ -96,7 +96,7 @@ export default function WebsiteReportHistory() {
             <p className="text-xs text-muted-text font-semibold">{error}</p>
             <button
               onClick={fetchHistory}
-              className="px-4 py-2 bg-deep-green text-white text-xs font-bold rounded-xl hover:bg-[#36E682] hover:text-deep-green transition-all"
+              className="px-4 py-2 bg-deep-green text-white text-xs font-bold rounded-xl hover:bg-[#36E682] hover:text-deep-green transition-all cursor-pointer"
             >
               Retry
             </button>
@@ -124,7 +124,7 @@ export default function WebsiteReportHistory() {
                 : 'N/A';
 
               const reportStatus = (audit.pdf_file || audit.status === 'DONE') ? 'Ready' : 'Not Generated';
-              const aiStatus = (audit.ai_recommendation || audit.has_ai_recommendations) ? 'Generated' : 'Not Generated';
+              const aiStatus = audit.has_ai_recommendations ? 'Generated' : 'Not Generated';
 
               return (
                 <div
@@ -184,7 +184,9 @@ export default function WebsiteReportHistory() {
                     {/* AI Status */}
                     <div>
                       <span className="text-[9px] font-black uppercase text-muted-text tracking-wider block mb-1">AI Insights</span>
-                      <span className="text-[9px] sm:text-[10px] font-bold text-deep-green/80 flex items-center gap-1">
+                      <span className={`text-[9px] sm:text-[10px] font-bold flex items-center gap-1 ${
+                        aiStatus === 'Generated' ? 'text-emerald-700 font-black' : 'text-muted-text'
+                      }`}>
                         <Sparkles className="w-3 h-3 text-forest-green flex-shrink-0" /> {aiStatus}
                       </span>
                     </div>

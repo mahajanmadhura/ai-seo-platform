@@ -211,7 +211,7 @@ export default function Dashboard() {
                   { id: 1, title: 'Add Domain', desc: 'Register your homepage URL inside your workspace.' },
                   { id: 2, title: 'Verify Ownership', desc: 'Embed snippet code token inside homepage.' },
                   { id: 3, title: 'Run Technical Audit', desc: 'Start crawler scanning process and calculations.' },
-                  { id: 4, title: 'AI Recommendations', desc: 'Review technical checklist roadmap by Groq.' }
+                  { id: 4, title: 'AI Recommendations', desc: 'Review technical optimization roadmap.' }
                 ].map((step) => {
                   const status = getStepStatus(step.id);
                   return (

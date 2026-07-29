@@ -9,11 +9,37 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
 from .utils import generate_token, async_task, send_verification_email
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 
 logger = logging.getLogger(__name__)
 
+User = get_user_model()
 
+class AdminRoleUpdateSerializer(serializers.ModelSerializer):
+    groups = serializers.ListField(
+        child=serializers.CharField(), write_only=True, required=False
+    )
 
+    class Meta:
+        model = User
+        fields = ['id', 'is_staff', 'groups']
+
+    def update(self, instance, validated_data):
+        group_names = validated_data.pop('groups', None)
+        
+        # Update standard user fields (like is_staff)
+        instance = super().update(instance, validated_data)
+        
+        # Handle dynamic Group assignment
+        if group_names is not None:
+            instance.groups.clear()
+            for name in group_names:
+                group, _ = Group.objects.get_or_create(name=name)
+                instance.groups.add(group)
+                
+        return instance
+    
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -108,4 +134,5 @@ class ForgotPasswordSerializer(serializers.Serializer):
 class ResetPasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True)
 
+ 
     

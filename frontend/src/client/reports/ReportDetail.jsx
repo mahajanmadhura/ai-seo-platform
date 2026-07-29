@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { getAuditDetail, getAuditIssues } from '../../services/audits';
-import { getAIRecommendation } from '../../services/aiRecommendations';
+import { getAIRecommendation, generateAIRecommendation } from '../../services/aiRecommendations';
 import { getBranding } from '../../services/reports';
 import {
   getCleanFilename,
@@ -33,7 +33,8 @@ import {
   Palette,
   Check,
   Clock,
-  Layers
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 
 export default function ReportDetail() {
@@ -49,6 +50,7 @@ export default function ReportDetail() {
   const [error, setError] = useState('');
 
   const [loadingAction, setLoadingAction] = useState(null); // 'pdf' | 'csv' | 'json' | 'email' | null
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function ReportDetail() {
         ]);
 
         if (issuesRes.success) setIssues(issuesRes.data || []);
-        if (recRes.success) setRecommendation(recRes.data);
+        if (recRes.success && recRes.data) setRecommendation(recRes.data);
         if (brandRes.success && brandRes.data) setBranding(brandRes.data);
       } else {
         setError(detailRes.message || 'Report not found.');
@@ -85,6 +87,23 @@ export default function ReportDetail() {
 
   const domain = audit?.website_domain || 'website';
   const isAuditDone = audit?.status === 'DONE';
+
+  const handleGenerateAI = async () => {
+    setGeneratingAI(true);
+    try {
+      const res = await generateAIRecommendation(auditId, Boolean(recommendation));
+      if (res.success && res.data) {
+        setRecommendation(res.data);
+        addToast('AI Executive Summary & Recommendations generated successfully!', 'success');
+      } else {
+        addToast(res.message || 'Failed to generate AI recommendations.', 'error');
+      }
+    } catch (err) {
+      addToast('Failed to generate AI recommendations.', 'error');
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
 
   const handleDownloadPDF = async () => {
     if (!isAuditDone) {
@@ -161,12 +180,12 @@ export default function ReportDetail() {
     setLoadingAction(null);
   };
 
-  const criticalErrors = issues.filter((i) => i.severity === 'ERROR' || i.category === 'ERROR');
-  const warningIssues = issues.filter((i) => i.severity === 'WARNING' || i.category === 'WARNING');
+  const pagesCrawledCount = audit?.total_pages || audit?.crawled_pages_count || 1;
+  const hasAiGenerated = Boolean(recommendation || audit?.has_ai_recommendations);
 
   return (
     <DashboardLayout title="Report Workspace">
-      <div className="space-y-6 max-w-6xl mx-auto text-left">
+      <div className="space-y-6 max-w-6xl mx-auto text-left font-sans">
         
         {/* Navigation Bar */}
         <div className="flex items-center justify-between border-b border-border-color/40 pb-4">
@@ -200,7 +219,7 @@ export default function ReportDetail() {
             <p className="text-xs text-muted-text font-semibold">{error}</p>
             <button
               onClick={() => navigate('/reports')}
-              className="px-4 py-2 bg-deep-green text-white text-xs font-bold rounded-xl"
+              className="px-4 py-2 bg-deep-green text-white text-xs font-bold rounded-xl cursor-pointer"
             >
               Return to Reports Library
             </button>
@@ -247,7 +266,7 @@ export default function ReportDetail() {
                 </div>
                 <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40">
                   <span className="text-[9px] font-black uppercase text-muted-text tracking-wider block">Pages Crawled</span>
-                  <span className="text-xs font-bold text-deep-green">{audit?.total_pages ?? 0} Pages</span>
+                  <span className="text-xs font-bold text-deep-green">{pagesCrawledCount} Pages</span>
                 </div>
                 <div className="bg-soft-bg p-3.5 rounded-2xl border border-border-color/40">
                   <span className="text-[9px] font-black uppercase text-muted-text tracking-wider block">Branding Applied</span>
@@ -296,13 +315,13 @@ export default function ReportDetail() {
                 </div>
 
                 <div className={`flex items-center gap-2.5 p-3 rounded-2xl border ${
-                  recommendation ? 'bg-emerald-50/60 border-emerald-200/60' : 'bg-soft-bg border-border-color/40'
+                  hasAiGenerated ? 'bg-emerald-50/60 border-emerald-200/60' : 'bg-soft-bg border-border-color/40'
                 }`}>
-                  <Check className={`w-4 h-4 flex-shrink-0 ${recommendation ? 'text-emerald-700' : 'text-muted-text/40'}`} />
+                  <Check className={`w-4 h-4 flex-shrink-0 ${hasAiGenerated ? 'text-emerald-700' : 'text-muted-text/40'}`} />
                   <div className="min-w-0">
                     <span className="text-[10px] font-black uppercase text-deep-green block">AI Recommendations</span>
-                    <span className="text-[9px] text-muted-text font-semibold block">
-                      {recommendation ? 'Generated' : 'Not Generated'}
+                    <span className={`text-[9px] font-bold block ${hasAiGenerated ? 'text-emerald-700 font-black' : 'text-muted-text'}`}>
+                      {hasAiGenerated ? 'Generated' : 'Not Generated'}
                     </span>
                   </div>
                 </div>
@@ -321,11 +340,27 @@ export default function ReportDetail() {
               </div>
             </div>
 
-            {/* 3. AI EXECUTIVE SUMMARY */}
+            {/* 3. AI EXECUTIVE SUMMARY WITH SINGLE ACTION BUTTON */}
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color/60 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-border-color/40 pb-3">
-                <Sparkles className="w-5 h-5 text-forest-green" />
-                <h3 className="text-sm font-black text-deep-green">AI Executive Summary & Recommendations</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-color/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-forest-green" />
+                  <h3 className="text-sm sm:text-base font-black text-deep-green">AI Executive Summary & Recommendations</h3>
+                </div>
+
+                {/* Single Clean Action Button */}
+                <button
+                  onClick={handleGenerateAI}
+                  disabled={generatingAI}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm disabled:opacity-50 shrink-0 self-start sm:self-auto"
+                >
+                  {generatingAI ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-current" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-[#36E682]" />
+                  )}
+                  <span>{recommendation ? 'Regenerate AI Recommendations' : 'Generate AI Recommendations'}</span>
+                </button>
               </div>
 
               {recommendation ? (
@@ -333,13 +368,13 @@ export default function ReportDetail() {
                   {recommendation.summary && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-black uppercase text-muted-text tracking-wider block">Key Summary</span>
-                      <p>{recommendation.summary}</p>
+                      <p className="bg-soft-bg p-4 rounded-2xl border border-border-color/40">{recommendation.summary}</p>
                     </div>
                   )}
 
                   {recommendation.client_friendly_explanation && (
                     <div className="space-y-1 bg-soft-bg p-4 rounded-2xl border border-border-color/40">
-                      <span className="text-[10px] font-black uppercase text-muted-text tracking-wider block">Client Overview</span>
+                      <span className="text-[10px] font-black uppercase text-muted-text tracking-wider block">Client Executive Overview</span>
                       <p>{recommendation.client_friendly_explanation}</p>
                     </div>
                   )}
@@ -347,10 +382,10 @@ export default function ReportDetail() {
                   {recommendation.quick_wins && recommendation.quick_wins.length > 0 && (
                     <div className="space-y-2">
                       <span className="text-[10px] font-black uppercase text-muted-text tracking-wider block">Quick Win Action Items</span>
-                      <ul className="space-y-1.5">
+                      <ul className="space-y-2">
                         {recommendation.quick_wins.map((win, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-xs font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#36E682]" />
+                          <li key={idx} className="flex items-start gap-2.5 text-xs font-semibold bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/80">
+                            <span className="w-2 h-2 rounded-full bg-[#36E682] shrink-0 mt-1" />
                             <span>{win}</span>
                           </li>
                         ))}
@@ -360,7 +395,8 @@ export default function ReportDetail() {
                 </div>
               ) : (
                 <div className="bg-soft-bg p-5 rounded-2xl border border-border-color/40 text-xs font-semibold text-muted-text leading-relaxed">
-                  AI recommendations were not generated for this audit.
+                  <p className="font-bold text-deep-green text-sm">AI Executive Summary Not Generated Yet</p>
+                  <p className="mt-0.5">Use the <strong className="text-deep-green">"Generate AI Recommendations"</strong> button in the section header above to run AI website analysis and generate optimization suggestions directly on this report workspace.</p>
                 </div>
               )}
             </div>
@@ -383,7 +419,6 @@ export default function ReportDetail() {
 
               {/* Responsive Bento Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {/* Download PDF - Primary Bento Tile */}
                 <button
                   onClick={handleDownloadPDF}
                   disabled={!isAuditDone || loadingAction !== null}
@@ -401,7 +436,6 @@ export default function ReportDetail() {
                   {loadingAction === 'pdf' && <Loader2 className="w-4 h-4 animate-spin" />}
                 </button>
 
-                {/* Export CSV Bento Tile */}
                 <button
                   onClick={handleExportCSV}
                   disabled={!isAuditDone || loadingAction !== null}
@@ -419,7 +453,6 @@ export default function ReportDetail() {
                   {loadingAction === 'csv' && <Loader2 className="w-4 h-4 animate-spin" />}
                 </button>
 
-                {/* Export JSON Bento Tile */}
                 <button
                   onClick={handleExportJSON}
                   disabled={!isAuditDone || loadingAction !== null}
@@ -437,7 +470,6 @@ export default function ReportDetail() {
                   {loadingAction === 'json' && <Loader2 className="w-4 h-4 animate-spin" />}
                 </button>
 
-                {/* Send Email Bento Tile */}
                 <button
                   onClick={() => setIsEmailModalOpen(true)}
                   disabled={!isAuditDone || loadingAction !== null}
@@ -455,7 +487,6 @@ export default function ReportDetail() {
                   {loadingAction === 'email' && <Loader2 className="w-4 h-4 animate-spin" />}
                 </button>
 
-                {/* Delete Report Bento Tile */}
                 <button
                   onClick={() => {
                     addToast('Report dismissed from active detail view.', 'info');
@@ -479,7 +510,6 @@ export default function ReportDetail() {
           </div>
         )}
 
-        {/* Email Modal Dialog */}
         <EmailModal
           isOpen={isEmailModalOpen}
           onClose={() => setIsEmailModalOpen(false)}

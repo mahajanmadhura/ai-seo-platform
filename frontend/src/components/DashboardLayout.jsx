@@ -12,11 +12,7 @@ import {
   X,
   Sparkles,
   ChevronLeft,
-  Plus,
-  User,
-  Shield,
-  CreditCard,
-  ArrowRight
+  Shield
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import LogoWhite from '../assets/White.png';
@@ -138,7 +134,7 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
               addToast('Returned to Admin Panel — Administrative tools active', 'success');
               navigate('/admin');
             }}
-            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold text-[#36E682] hover:bg-[#083D36] hover:text-white transition-all cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold text-[#36E682] hover:bg-[#083D36] hover:text-[#36E682] transition-all cursor-pointer text-left"
           >
             <Shield className="w-4 h-4 text-[#36E682]" />
             <span>Admin Panel</span>
@@ -177,7 +173,7 @@ export default function DashboardLayout({ children, title, cta, backLink }) {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden p-1.5 hover:bg-soft-bg rounded-lg text-deep-green transition-colors cursor-pointer"
+              className="md:hidden p-1.5 hover:bg-soft-bg rounded-lg text-deep-green transition-colors cursor-cursor"
             >
               <Menu className="w-5 h-5" />
             </button>

@@ -5,6 +5,8 @@ from audits.models import Audit, CrawledPage, SEOIssues
 class AuditListSerializer(serializers.ModelSerializer):
     website_domain = serializers.CharField(source='website.domain', read_only=True)
     overall_score = serializers.SerializerMethodField()
+    has_ai_recommendations = serializers.SerializerMethodField()
+    total_pages = serializers.SerializerMethodField()
 
     class Meta:
         model = Audit
@@ -15,6 +17,9 @@ class AuditListSerializer(serializers.ModelSerializer):
             'key_word',
             'status',
             'overall_score',
+            'total_pages',
+            'has_ai_recommendations',
+            'ai_recommendation',
             'started_at',
             'completed_at'
         ]
@@ -29,10 +34,21 @@ class AuditListSerializer(serializers.ModelSerializer):
                 return int(sum(scores) / len(scores))
         return 0
 
+    def get_has_ai_recommendations(self, obj):
+        from ai_recommendations.models import AIRecommendation
+        return AIRecommendation.objects.filter(audit=obj).exists()
+
+    def get_total_pages(self, obj):
+        count = obj.crawledpage_set.count()
+        return count if count > 0 else (obj.total_pages or 0)
+
+
 class AuditDetailSerializer(serializers.ModelSerializer):
     website_domain = serializers.CharField(source='website.domain', read_only=True)
     overall_score = serializers.SerializerMethodField()
     ai_summary = serializers.CharField(source='ai_recommendation', read_only=True)
+    has_ai_recommendations = serializers.SerializerMethodField()
+    total_pages = serializers.SerializerMethodField()
     crawled_pages_count = serializers.SerializerMethodField()
     issues_count = serializers.SerializerMethodField()
     errors_count = serializers.SerializerMethodField()
@@ -48,6 +64,8 @@ class AuditDetailSerializer(serializers.ModelSerializer):
             'status',
             'overall_score',
             'ai_summary',
+            'has_ai_recommendations',
+            'total_pages',
             'crawled_pages_count',
             'issues_count',
             'errors_count',
@@ -68,8 +86,17 @@ class AuditDetailSerializer(serializers.ModelSerializer):
                 return int(sum(scores) / len(scores))
         return None
 
+    def get_has_ai_recommendations(self, obj):
+        from ai_recommendations.models import AIRecommendation
+        return AIRecommendation.objects.filter(audit=obj).exists()
+
+    def get_total_pages(self, obj):
+        count = obj.crawledpage_set.count()
+        return count if count > 0 else (obj.total_pages or 0)
+
     def get_crawled_pages_count(self, obj):
-        return obj.crawledpage_set.count()
+        count = obj.crawledpage_set.count()
+        return count if count > 0 else (obj.total_pages or 0)
 
     def get_issues_count(self, obj):
         return SEOIssues.objects.filter(Q(audit=obj) | Q(url__audit=obj)).count()

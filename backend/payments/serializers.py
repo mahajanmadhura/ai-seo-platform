@@ -1,5 +1,27 @@
 from rest_framework import serializers
 from .models import UserCredit, Payment, CreditTransaction
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class AdminUserOverviewSerializer(serializers.ModelSerializer):
+    """Serializer for the User List & Overview admin page."""
+    available_credits = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'available_credits']
+
+    def get_available_credits(self, obj):
+        credit_account = UserCredit.objects.filter(user=obj).first()
+        return credit_account.balance if credit_account else 0
+
+
+class AdminCreditAdjustmentSerializer(serializers.Serializer):
+    """Serializer for manual credit adjustments by administrators."""
+    amount = serializers.IntegerField(help_text="Amount of credits to add (positive) or deduct (negative)")
+    reason = serializers.CharField(max_length=255, help_text="Reason for the manual adjustment")
 
 
 class UserCreditSerializer(serializers.ModelSerializer):

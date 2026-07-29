@@ -29,7 +29,7 @@ export default function StatsCards({ totalCount, credits, auditsCount, averageSc
     {
       title: 'Credits Remaining',
       value: credits ?? 0,
-      desc: 'Crawler token balance',
+      desc: 'Analysis credit balance',
       isPrimary: false,
       textColor: 'text-[#053D34]',
       descColor: 'text-[#6D8179]',
@@ -39,7 +39,7 @@ export default function StatsCards({ totalCount, credits, auditsCount, averageSc
     {
       title: 'Audits Performed',
       value: auditsCount ?? 0,
-      desc: 'Crawl operations logs',
+      desc: 'Website analysis logs',
       isPrimary: false,
       textColor: 'text-[#053D34]',
       descColor: 'text-[#6D8179]',

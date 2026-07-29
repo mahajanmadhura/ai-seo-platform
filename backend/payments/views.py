@@ -15,7 +15,6 @@ from .serializers import (
     CreditTransactionSerializer,
 )
 
-
 class CreditBalanceView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -122,86 +121,8 @@ class CreditTransactionHistoryView(APIView):
         transactions = CreditTransaction.objects.filter(user=request.user).order_by('-created_at')
         serializer = CreditTransactionSerializer(transactions, many=True)
         return Response(serializer.data)
-    
-
-from rest_framework.permissions import IsAdminUser
-from django.contrib.auth import get_user_model
-from django.db.models import Sum, Count
-
-User = get_user_model()
 
 
-class AdminUsersListView(APIView):
-    permission_classes = [IsAdminUser]
-
-    def get(self, request):
-        users = User.objects.all()
-        data = []
-        for user in users:
-            credit_account, _ = UserCredit.objects.get_or_create(user=user)
-            data.append({
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'is_active': user.is_active,
-                'credits': credit_account.balance,
-            })
-        return Response(data)
-
-
-class AdminCreditAdjustView(APIView):
-    permission_classes = [IsAdminUser]
-
-    def put(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        new_balance = request.data.get('balance')
-        if new_balance is None:
-            return Response({'error': 'balance is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        credit_account, _ = UserCredit.objects.get_or_create(user=user)
-        old_balance = credit_account.balance
-        credit_account.balance = new_balance
-        credit_account.save()
-
-        CreditTransaction.objects.create(
-            user=user,
-            amount=new_balance - old_balance,
-            transaction_type='admin_adjustment',
-            description=f'Admin adjusted credits from {old_balance} to {new_balance}',
-        )
-
-        return Response({'message': 'Credits adjusted', 'new_balance': credit_account.balance})
-
-
-class AdminAnalyticsView(APIView):
-    permission_classes = [IsAdminUser]
-
-    def get(self, request):
-        total_users = User.objects.count()
-        total_revenue = Payment.objects.filter(status='success').aggregate(total=Sum('amount'))['total'] or 0
-        total_credits_sold = Payment.objects.filter(status='success').aggregate(total=Sum('credits_purchased'))['total'] or 0
-        total_payments = Payment.objects.filter(status='success').count()
-
-        return Response({
-            'total_users': total_users,
-            'total_revenue': total_revenue,
-            'total_credits_sold': total_credits_sold,
-            'total_successful_payments': total_payments,
-        })
-
-
-class AdminAuditLogsView(APIView):
-    permission_classes = [IsAdminUser]
-
-    def get(self, request):
-        transactions = CreditTransaction.objects.all().order_by('-created_at')[:100]
-        serializer = CreditTransactionSerializer(transactions, many=True)
-        return Response(serializer.data)
-    
 from .models import APIKey
 
 class GenerateAPIKeyView(APIView):
