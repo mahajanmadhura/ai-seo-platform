@@ -8,6 +8,7 @@ import AdminWebsitesView from './pages/AdminWebsitesView';
 import AdminAuditsView from './pages/AdminAuditsView';
 import AdminAiAnalyticsView from './pages/AdminAiAnalyticsView';
 import AdminSystemHealthView from './pages/AdminSystemHealthView';
+import AdminReportsCenterView from './pages/AdminReportsCenterView';
 
 export default function AdminDashboard() {
   const location = useLocation();
@@ -19,6 +20,8 @@ export default function AdminDashboard() {
         return <AdminDashboardView />;
       case '/admin/revenue':
         return <AdminRevenueView />;
+      case '/admin/reports':
+        return <AdminReportsCenterView />;
       case '/admin/users':
         return <AdminUsersView />;
       case '/admin/websites':

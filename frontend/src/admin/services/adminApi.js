@@ -99,6 +99,52 @@ export const adminApi = {
     const res = await adminAxios.get(`/api/v1/admin/system/logs/?page=${page}`);
     return res.data;
   },
+
+  // 8. Reports Center
+  getReportsData: async (params = {}) => {
+    const queryParams = new URLSearchParams(params).toString();
+    const res = await adminAxios.get(`/api/v1/admin/reports/data/?${queryParams}`);
+    return res.data;
+  },
+
+  downloadReportExport: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null) {
+        queryParams.append(key, params[key]);
+      }
+    });
+
+    const format = (params.format || 'csv').toLowerCase();
+    const reportType = params.report_type || 'revenue';
+    const ext = format === 'pdf' ? 'pdf' : 'csv';
+    const mimeType = format === 'pdf' ? 'application/pdf' : 'text/csv;charset=utf-8;';
+    const filename = `Athenura_${reportType.toLowerCase()}_report.${ext}`;
+
+    const res = await adminAxios.get(`/api/v1/admin/reports/export/?${queryParams.toString()}`, {
+      responseType: 'blob',
+    });
+
+    const blob = new Blob([res.data], { type: mimeType });
+
+    if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+      window.navigator.msSaveOrOpenBlob(blob, filename);
+    } else {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) {
+          link.parentNode.removeChild(link);
+        }
+        window.URL.revokeObjectURL(blobUrl);
+      }, 300);
+    }
+  },
 };
 
 export default adminApi;

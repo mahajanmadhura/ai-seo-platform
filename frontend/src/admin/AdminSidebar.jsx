@@ -10,7 +10,8 @@ import {
   LogOut,
   X,
   Eye,
-  CreditCard
+  CreditCard,
+  BarChart3
 } from 'lucide-react';
 import LogoWhite from '../assets/White.png';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,7 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen, handleLogout }
       items: [
         { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
         { name: 'Revenue', path: '/admin/revenue', icon: CreditCard },
+        { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
       ],
     },
     {
