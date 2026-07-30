@@ -12,7 +12,7 @@ import ReportSkeleton from './components/ReportSkeleton';
 export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState('revenue');
 
-  // Filters State
+  // Dynamic Filters State
   const [dateRange, setDateRange] = useState('7d');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -20,7 +20,7 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [websiteFilter, setWebsiteFilter] = useState('all');
 
-  // Directory Options
+  // Directory Options for Dropdowns
   const [usersList, setUsersList] = useState([]);
   const [websitesList, setWebsitesList] = useState([]);
 
@@ -50,8 +50,8 @@ export default function ReportsPage() {
     fetchOptions();
   }, []);
 
-  // Fetch Report Telemetry
-  const handleGenerateReport = async () => {
+  // Fetch Report Telemetry (Synchronized for Live Preview)
+  const fetchReportData = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -69,17 +69,22 @@ export default function ReportsPage() {
       setLastRefreshed(new Date());
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to generate report data');
-      addToast('Failed to generate report', 'error');
+      addToast('Failed to load report data', 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  // Live Automatic Synchronization (300ms Debounce)
   useEffect(() => {
-    handleGenerateReport();
-  }, [selectedReport]);
+    const timer = setTimeout(() => {
+      fetchReportData();
+    }, 300);
 
-  // Handle Download Exports
+    return () => clearTimeout(timer);
+  }, [selectedReport, dateRange, startDate, endDate, userFilter, statusFilter, websiteFilter]);
+
+  // Handle Download Exports (PDF, Excel, JSON)
   const handleExport = async (format) => {
     setExporting(true);
     try {
@@ -109,21 +114,27 @@ export default function ReportsPage() {
       transition={{ duration: 0.2 }}
       className="space-y-6 text-left pb-16 font-sans overflow-x-hidden"
     >
-      {/* Standardized Header */}
+      {/* Standardized Admin Header */}
       <AdminHeader
-        title="Reports"
+        title="Reports Center"
         lastUpdated={lastRefreshed}
-        onRefresh={handleGenerateReport}
+        onRefresh={fetchReportData}
         loading={loading}
       />
 
       {/* STEP 1: Interactive Report Selection Cards */}
       <ReportSelector
         selectedReport={selectedReport}
-        onSelectReport={setSelectedReport}
+        onSelectReport={(report) => {
+          setSelectedReport(report);
+          // Reset specific filters when switching report category for clean UX
+          setUserFilter('all');
+          setStatusFilter('all');
+          setWebsiteFilter('all');
+        }}
       />
 
-      {/* STEP 2: Filter Parameters with Enterprise Dropdowns */}
+      {/* STEP 2: Declarative Dynamic Filter System */}
       <ReportFilters
         selectedReport={selectedReport}
         dateRange={dateRange}
@@ -141,13 +152,13 @@ export default function ReportsPage() {
         usersList={usersList}
         websitesList={websitesList}
         loading={loading}
-        onGenerate={handleGenerateReport}
+        onRefresh={fetchReportData}
       />
 
       {/* Error View */}
-      {error && <AdminErrorState message={error} onRetry={handleGenerateReport} />}
+      {error && <AdminErrorState message={error} onRetry={fetchReportData} />}
 
-      {/* STEP 3 & 4: Report Skeleton or Report Preview Container */}
+      {/* STEP 3 & 4: Live Preview & Export Pipeline */}
       {!error && (
         <>
           {loading ? (

@@ -225,7 +225,7 @@ export default function AdminUsersView() {
 
       {/* Full-Width Table Card (No Right Side Widget, No Slider, Single-Line Text) */}
       <div className="bg-white rounded-xl border border-zinc-200 shadow-2xs overflow-hidden w-full">
-        
+
         {/* Table Action Bar */}
         <div className="p-3 border-b border-zinc-100 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200">
@@ -233,13 +233,12 @@ export default function AdminUsersView() {
               <button
                 key={rf}
                 onClick={() => setRoleFilter(rf)}
-                className={`px-3 py-1.5 rounded text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  roleFilter === rf
+                className={`px-3 py-1.5 rounded text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${roleFilter === rf
                     ? 'bg-zinc-950 text-white font-black'
                     : 'text-zinc-600 hover:text-zinc-950'
-                }`}
+                  }`}
               >
-                {rf === 'ALL' ? 'All Roles' : rf === 'SUPERUSER' ? 'Super Admin' : rf === 'CUSTOMER' ? 'Customer' : rf === 'STAFF' ? 'Staff' : rf}
+                {rf === 'ALL' ? 'All Roles' : rf === 'SUPERUSER' ? 'Super Admin' : rf}
               </button>
             ))}
           </div>
@@ -277,10 +276,9 @@ export default function AdminUsersView() {
 
                 {/* Role Badge - Single Line Always */}
                 <td className="px-5 py-3.5 whitespace-nowrap">
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
-                    user.is_superuser ? 'bg-zinc-950 text-white' :
-                    user.is_staff ? 'bg-zinc-100 text-zinc-900 border border-zinc-200' : 'bg-zinc-50 text-zinc-600 border border-zinc-200'
-                  }`}>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ${user.is_superuser ? 'bg-zinc-950 text-white' :
+                      user.is_staff ? 'bg-zinc-100 text-zinc-900 border border-zinc-200' : 'bg-zinc-50 text-zinc-600 border border-zinc-200'
+                    }`}>
                     <Shield className="w-3 h-3 shrink-0" />
                     <span className="whitespace-nowrap">{user.is_superuser ? 'Super Admin' : user.is_staff ? 'Staff' : 'Customer'}</span>
                   </span>

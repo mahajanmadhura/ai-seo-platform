@@ -115,10 +115,23 @@ export const adminApi = {
       }
     });
 
-    const format = (params.format || 'csv').toLowerCase();
+    const format = (params.format || 'pdf').toLowerCase();
     const reportType = params.report_type || 'revenue';
-    const ext = format === 'pdf' ? 'pdf' : 'csv';
-    const mimeType = format === 'pdf' ? 'application/pdf' : 'text/csv;charset=utf-8;';
+    
+    let ext = 'pdf';
+    let mimeType = 'application/pdf';
+
+    if (format === 'json') {
+      ext = 'json';
+      mimeType = 'application/json;charset=utf-8;';
+    } else if (format === 'excel' || format === 'xlsx') {
+      ext = 'xlsx';
+      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    } else if (format === 'csv') {
+      ext = 'csv';
+      mimeType = 'text/csv;charset=utf-8;';
+    }
+
     const filename = `Athenura_${reportType.toLowerCase()}_report.${ext}`;
 
     const res = await adminAxios.get(`/api/v1/admin/reports/export/?${queryParams.toString()}`, {

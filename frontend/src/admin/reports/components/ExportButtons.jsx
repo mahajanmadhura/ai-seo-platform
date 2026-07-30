@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileCode, Loader2 } from 'lucide-react';
 
 export default function ExportButtons({ onExport, exporting }) {
   return (
@@ -23,12 +23,12 @@ export default function ExportButtons({ onExport, exporting }) {
       </button>
 
       <button
-        onClick={() => onExport('csv')}
+        onClick={() => onExport('json')}
         disabled={exporting}
         className="px-3 py-1.5 bg-white text-zinc-900 border border-zinc-200 text-xs font-bold rounded-lg hover:bg-zinc-50 transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-2xs"
       >
-        <Download className="w-3.5 h-3.5 text-zinc-600" />
-        <span>CSV</span>
+        <FileCode className="w-3.5 h-3.5 text-amber-600" />
+        <span>JSON</span>
       </button>
     </div>
   );
