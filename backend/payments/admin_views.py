@@ -92,167 +92,185 @@ class AdminDashboardAnalyticsView(StandardizedResponseMixin, APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        today = timezone.now().date()
-        seven_days_ago = today - timedelta(days=6)
+        try:
+            today = timezone.now().date()
+            seven_days_ago = today - timedelta(days=6)
 
-        # 1. KPIs (Strictly Real Database Aggregation)
-        total_revenue = Payment.objects.filter(status='success').aggregate(Sum('amount'))['amount__sum'] or 0
-        active_users_count = User.objects.filter(is_active=True).count()
-        crawls_today_count = Audit.objects.filter(started_at__date=today).count()
-        total_crawls_all_time = Audit.objects.count()
+            # 1. KPIs (Strictly Real Database Aggregation)
+            total_revenue = Payment.objects.filter(status='success').aggregate(Sum('amount'))['amount__sum'] or 0
+            active_users_count = User.objects.filter(is_active=True).count()
+            crawls_today_count = Audit.objects.filter(started_at__date=today).count()
+            total_crawls_all_time = Audit.objects.count()
 
-        # Real AI Token calculation matching GroqUsageStatsView
-        user_recs_count = UserAIRecommendation.objects.count()
-        logged_tokens = LLMRequestLog.objects.aggregate(Sum('total_tokens'))['total_tokens__sum'] or 0
-        estimated_tokens_from_recs = user_recs_count * 1300
-        total_ai_tokens = max(logged_tokens, estimated_tokens_from_recs)
+            # Real AI Token calculation matching GroqUsageStatsView
+            logged_tokens = LLMRequestLog.objects.aggregate(Sum('total_tokens'))['total_tokens__sum'] or 0
+            try:
+                user_recs_count = UserAIRecommendation.objects.count()
+            except Exception:
+                user_recs_count = 0
+            estimated_tokens_from_recs = user_recs_count * 1300
+            total_ai_tokens = max(logged_tokens, estimated_tokens_from_recs)
 
-        # 7-day sparkline arrays
-        days_range = [seven_days_ago + timedelta(days=i) for i in range(7)]
-        date_labels = [d.strftime('%b %d') for d in days_range]
+            # 7-day sparkline arrays
+            days_range = [seven_days_ago + timedelta(days=i) for i in range(7)]
+            date_labels = [d.strftime('%b %d') for d in days_range]
 
-        revenue_sparkline = []
-        crawls_sparkline = []
-        users_sparkline = []
-        ai_sparkline = []
-        audit_activity_chart = []
+            revenue_sparkline = []
+            crawls_sparkline = []
+            users_sparkline = []
+            ai_sparkline = []
+            audit_activity_chart = []
 
-        for day in days_range:
-            rev_day = Payment.objects.filter(status='success', created_at__date=day).aggregate(Sum('amount'))['amount__sum'] or 0
-            revenue_sparkline.append(float(rev_day))
+            for day in days_range:
+                rev_day = Payment.objects.filter(status='success', created_at__date=day).aggregate(Sum('amount'))['amount__sum'] or 0
+                revenue_sparkline.append(float(rev_day))
 
-            audits_on_day = Audit.objects.filter(started_at__date=day)
-            total_count = audits_on_day.count()
-            crawls_sparkline.append(total_count)
+                audits_on_day = Audit.objects.filter(started_at__date=day)
+                total_count = audits_on_day.count()
+                crawls_sparkline.append(total_count)
 
-            users_day = User.objects.filter(date_joined__date=day).count() if hasattr(User, 'date_joined') else 0
-            users_sparkline.append(users_day)
+                users_day = User.objects.filter(date_joined__date=day).count() if hasattr(User, 'date_joined') else 0
+                users_sparkline.append(users_day)
 
-            ai_day = UserAIRecommendation.objects.filter(created_at__date=day).count()
-            ai_sparkline.append(ai_day * 1300 if ai_day > 0 else 0)
+                try:
+                    ai_day = UserAIRecommendation.objects.filter(created_at__date=day).count()
+                except Exception:
+                    ai_day = 0
+                ai_sparkline.append(ai_day * 1300 if ai_day > 0 else 0)
 
-            completed_cnt = audits_on_day.filter(status='DONE').count()
-            running_cnt = audits_on_day.filter(status='RUNNING').count()
-            failed_cnt = audits_on_day.filter(status='FAILED').count()
-            pending_cnt = audits_on_day.filter(status='PENDING').count()
-            avg_s = audits_on_day.filter(status='DONE').aggregate(Avg('overall_Score'))['overall_Score__avg'] or 0
+                completed_cnt = audits_on_day.filter(status__iexact='DONE').count()
+                running_cnt = audits_on_day.filter(Q(status__iexact='RUNNING') | Q(status__iexact='CRAWLING')).count()
+                failed_cnt = audits_on_day.filter(status__iexact='FAILED').count()
+                pending_cnt = audits_on_day.filter(status__iexact='PENDING').count()
+                avg_s = audits_on_day.filter(status__iexact='DONE').aggregate(Avg('overall_Score'))['overall_Score__avg'] or 0
 
-            audit_activity_chart.append({
-                "date": day.strftime('%b %d'),
-                "day_name": day.strftime('%a'),
-                "full_date": day.strftime('%Y-%m-%d'),
-                "count": total_count,
-                "completed": completed_cnt,
-                "running": running_cnt,
-                "failed": failed_cnt,
-                "pending": pending_cnt,
-                "credits_consumed": total_count * 5,
-                "avg_score": round(avg_s, 1),
-                "worker_latency_ms": 1250 if total_count > 0 else 0
-            })
+                audit_activity_chart.append({
+                    "date": day.strftime('%b %d'),
+                    "day_name": day.strftime('%a'),
+                    "full_date": day.strftime('%Y-%m-%d'),
+                    "count": total_count,
+                    "completed": completed_cnt,
+                    "running": running_cnt,
+                    "failed": failed_cnt,
+                    "pending": pending_cnt,
+                    "credits_consumed": total_count * 5,
+                    "avg_score": round(avg_s, 1),
+                    "worker_latency_ms": 1250 if total_count > 0 else 0
+                })
 
-        # 2. Charts Data (Real Database Objects)
-        revenue_chart = [{"date": label, "amount": rev} for label, rev in zip(date_labels, revenue_sparkline)]
-        credits_sold_chart = [{"date": label, "credits": int(rev / 10) if rev > 0 else 0} for label, rev in zip(date_labels, revenue_sparkline)]
+            # 2. Charts Data (Real Database Objects)
+            revenue_chart = [{"date": label, "amount": rev} for label, rev in zip(date_labels, revenue_sparkline)]
+            credits_sold_chart = [{"date": label, "credits": int(rev / 10) if rev > 0 else 0} for label, rev in zip(date_labels, revenue_sparkline)]
 
-        # 3. Top SEO Issue Categories (Real database aggregation from SEOIssues)
-        error_count = SEOIssues.objects.filter(issue_type='ERROR').count()
-        warning_count = SEOIssues.objects.filter(issue_type='WARNING').count()
-        notice_count = SEOIssues.objects.filter(issue_type='NOTICE').count()
+            # 3. Top SEO Issue Categories (Real database aggregation from SEOIssues)
+            top_seo_issues = []
+            try:
+                error_count = SEOIssues.objects.filter(issue_type='ERROR').count()
+                warning_count = SEOIssues.objects.filter(issue_type='WARNING').count()
+                notice_count = SEOIssues.objects.filter(issue_type='NOTICE').count()
 
-        top_seo_issues = []
-        if error_count > 0:
-            top_seo_issues.append({"issue_category": "Critical Errors", "count": error_count})
-        if warning_count > 0:
-            top_seo_issues.append({"issue_category": "Warnings", "count": warning_count})
-        if notice_count > 0:
-            top_seo_issues.append({"issue_category": "Notices", "count": notice_count})
+                if error_count > 0:
+                    top_seo_issues.append({"issue_category": "Critical Errors", "count": error_count})
+                if warning_count > 0:
+                    top_seo_issues.append({"issue_category": "Warnings", "count": warning_count})
+                if notice_count > 0:
+                    top_seo_issues.append({"issue_category": "Notices", "count": notice_count})
+            except Exception:
+                pass
 
-        # 4. Top Customers Ranking by Payment Sum (Real DB query)
-        top_paying_users = (
-            Payment.objects.filter(status='success')
-            .values('user__email')
-            .annotate(total=Sum('amount'))
-            .order_by('-total')[:5]
-        )
-        top_customers = [{"label": p['user__email'].split('@')[0], "value": float(p['total'])} for p in top_paying_users]
+            # 4. Top Customers Ranking by Payment Sum (Real DB query)
+            top_paying_users = (
+                Payment.objects.filter(status='success')
+                .values('user__email')
+                .annotate(total=Sum('amount'))
+                .order_by('-total')[:5]
+            )
+            top_customers = [{"label": p['user__email'].split('@')[0], "value": float(p['total'])} for p in top_paying_users if p.get('user__email')]
 
-        # 5. Audit Breakdown & Latest Executions
-        total_7d_audits = Audit.objects.count()
-        completed_7d = Audit.objects.filter(status='DONE').count()
-        running_7d = Audit.objects.filter(status='RUNNING').count()
-        pending_7d = Audit.objects.filter(status='PENDING').count()
-        failed_7d = Audit.objects.filter(status='FAILED').count()
+            # 5. Audit Breakdown & Latest Executions
+            total_7d_audits = Audit.objects.count()
+            completed_7d = Audit.objects.filter(status__iexact='DONE').count()
+            running_7d = Audit.objects.filter(Q(status__iexact='RUNNING') | Q(status__iexact='CRAWLING')).count()
+            pending_7d = Audit.objects.filter(status__iexact='PENDING').count()
+            failed_7d = Audit.objects.filter(status__iexact='FAILED').count()
 
-        audit_breakdown = {
-            "total_audits": total_7d_audits,
-            "completed": completed_7d,
-            "running": running_7d,
-            "pending": pending_7d,
-            "failed": failed_7d,
-            "credits_used": completed_7d * 5
-        }
+            audit_breakdown = {
+                "total_audits": total_7d_audits,
+                "completed": completed_7d,
+                "running": running_7d,
+                "pending": pending_7d,
+                "failed": failed_7d,
+                "credits_used": completed_7d * 5
+            }
 
-        latest_audits = []
-        for aud in Audit.objects.all().select_related('website').order_by('-started_at')[:5]:
-            domain_name = getattr(aud.website, 'domain', None) or f"Website #{aud.website_id}"
-            latest_audits.append({
-                "id": aud.id,
-                "domain": domain_name,
-                "status": aud.status,
-                "score": aud.overall_Score,
-                "error": None,
-                "credits": "+5 Credits" if aud.status == 'DONE' else "0 Credits",
-                "timestamp": aud.started_at
-            })
+            latest_audits = []
+            for aud in Audit.objects.all().select_related('website').order_by('-started_at')[:5]:
+                domain_name = getattr(aud.website, 'domain', None) or f"Website #{aud.website_id}"
+                latest_audits.append({
+                    "id": aud.id,
+                    "domain": domain_name,
+                    "status": aud.status,
+                    "score": aud.overall_Score,
+                    "error": None,
+                    "credits": "+5 Credits" if aud.status == 'DONE' else "0 Credits",
+                    "timestamp": aud.started_at.isoformat() if aud.started_at else None
+                })
 
-        # 6. Recent Operational Activity Timeline
-        recent_activity = []
+            # 6. Recent Operational Activity Timeline
+            recent_activity = []
 
-        for aud in Audit.objects.all().order_by('-started_at')[:4]:
-            recent_activity.append({
-                "type": "audit_completed" if aud.status == 'DONE' else "audit_started",
-                "title": f"Audit #{aud.id} {aud.status.lower()}",
-                "description": f"Website #{aud.website_id} • Score: {aud.overall_Score or 'N/A'}/100",
-                "timestamp": aud.started_at
-            })
+            for aud in Audit.objects.all().order_by('-started_at')[:4]:
+                t_str = aud.started_at.isoformat() if aud.started_at else timezone.now().isoformat()
+                recent_activity.append({
+                    "type": "audit_completed" if aud.status == 'DONE' else "audit_started",
+                    "title": f"Audit #{aud.id} {aud.status.lower()}",
+                    "description": f"Website #{aud.website_id} • Score: {aud.overall_Score or 'N/A'}/100",
+                    "timestamp": t_str
+                })
 
-        for p in Payment.objects.filter(status='success').order_by('-created_at')[:3]:
-            recent_activity.append({
-                "type": "payment_received",
-                "title": f"Payment ₹{p.amount} received",
-                "description": f"Purchased {p.credits_purchased} credits via {p.gateway}",
-                "timestamp": p.created_at
-            })
+            for p in Payment.objects.filter(status='success').defer('failure_reason').order_by('-created_at')[:3]:
+                t_str = p.created_at.isoformat() if p.created_at else timezone.now().isoformat()
+                recent_activity.append({
+                    "type": "payment_received",
+                    "title": f"Payment ₹{p.amount} received",
+                    "description": f"Purchased {p.credits_purchased} credits via {p.gateway}",
+                    "timestamp": t_str
+                })
 
-        for u in User.objects.all().order_by('-id')[:3]:
-            recent_activity.append({
-                "type": "user_registered",
-                "title": f"New user registered: {u.email}",
-                "description": f"Role: {'Superuser' if u.is_superuser else 'Staff Admin' if u.is_staff else 'Customer'}",
-                "timestamp": getattr(u, 'date_joined', None) or timezone.now()
-            })
+            for u in User.objects.all().order_by('-id')[:3]:
+                d_joined = getattr(u, 'date_joined', None)
+                t_str = d_joined.isoformat() if d_joined else timezone.now().isoformat()
+                recent_activity.append({
+                    "type": "user_registered",
+                    "title": f"New user registered: {u.email}",
+                    "description": f"Role: {'Superuser' if u.is_superuser else 'Staff Admin' if u.is_staff else 'Customer'}",
+                    "timestamp": t_str
+                })
 
-        recent_activity.sort(key=lambda x: x['timestamp'] or timezone.now(), reverse=True)
+            recent_activity.sort(key=lambda x: str(x['timestamp']), reverse=True)
 
-        data = {
-            "kpis": {
-                "revenue": { "value": float(total_revenue), "trend_percent": 0.0, "sparkline": revenue_sparkline },
-                "active_users": { "value": active_users_count, "trend_percent": 0.0, "sparkline": users_sparkline },
-                "crawls_today": { "value": crawls_today_count, "trend_percent": 0.0, "sparkline": crawls_sparkline },
-                "total_crawls_all_time": total_crawls_all_time,
-                "ai_requests": { "value": total_ai_tokens, "trend_percent": 0.0, "sparkline": ai_sparkline }
-            },
-            "revenue_chart": revenue_chart,
-            "audit_activity_chart": audit_activity_chart,
-            "credits_sold_chart": credits_sold_chart,
-            "top_customers": top_customers,
-            "top_seo_issues": top_seo_issues,
-            "audit_breakdown": audit_breakdown,
-            "latest_audits": latest_audits,
-            "recent_activity": recent_activity[:8]
-        }
-        return Response(data, status=status.HTTP_200_OK)
+            data = {
+                "kpis": {
+                    "revenue": { "value": float(total_revenue), "trend_percent": 0.0, "sparkline": revenue_sparkline },
+                    "active_users": { "value": active_users_count, "trend_percent": 0.0, "sparkline": users_sparkline },
+                    "crawls_today": { "value": crawls_today_count, "trend_percent": 0.0, "sparkline": crawls_sparkline },
+                    "total_crawls_all_time": total_crawls_all_time,
+                    "ai_requests": { "value": total_ai_tokens, "trend_percent": 0.0, "sparkline": ai_sparkline }
+                },
+                "revenue_chart": revenue_chart,
+                "audit_activity_chart": audit_activity_chart,
+                "credits_sold_chart": credits_sold_chart,
+                "top_customers": top_customers,
+                "top_seo_issues": top_seo_issues,
+                "audit_breakdown": audit_breakdown,
+                "latest_audits": latest_audits,
+                "recent_activity": recent_activity[:8]
+            }
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({'error': f"Failed to load analytics: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminUserDetailAnalyticsView(StandardizedResponseMixin, APIView):
@@ -338,13 +356,13 @@ class AdminRevenueOverviewView(StandardizedResponseMixin, APIView):
 
     def get(self, request):
         # 1. Fetch Payment records
-        valid_payments = Payment.objects.filter(Q(status__iexact='success') | Q(status__iexact='completed') | Q(status__iexact='paid'))
+        valid_payments = Payment.objects.filter(Q(status__iexact='success') | Q(status__iexact='completed') | Q(status__iexact='paid')).defer('failure_reason')
         
         if not valid_payments.exists():
-            valid_payments = Payment.objects.exclude(status__iexact='failed')
+            valid_payments = Payment.objects.exclude(status__iexact='failed').defer('failure_reason')
 
         if not valid_payments.exists():
-            valid_payments = Payment.objects.all()
+            valid_payments = Payment.objects.all().defer('failure_reason')
 
         total_revenue = valid_payments.aggregate(Sum('amount'))['amount__sum'] or 0
         total_credits_sold = valid_payments.aggregate(Sum('credits_purchased'))['credits_purchased__sum'] or 0
@@ -416,7 +434,7 @@ class AdminRevenueOverviewView(StandardizedResponseMixin, APIView):
         user_ledger.sort(key=lambda x: x['total_spent'], reverse=True)
 
         # 3. All Transactions list
-        transactions_qs = Payment.objects.all().select_related('user').order_by('-created_at')[:200]
+        transactions_qs = Payment.objects.all().select_related('user').defer('failure_reason').order_by('-created_at')[:200]
         tx_list = []
         for p in transactions_qs:
             tx_list.append({

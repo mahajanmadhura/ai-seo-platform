@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Users, CreditCard, Activity, Cpu, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Users, Activity, Cpu, Coins, CheckCircle2 } from 'lucide-react';
 
 export default function ReportSelector({ selectedReport, onSelectReport }) {
   const reportCards = [
@@ -11,27 +11,27 @@ export default function ReportSelector({ selectedReport, onSelectReport }) {
     },
     {
       id: 'customers',
-      title: 'Customers',
-      subtitle: 'User analytics',
+      title: 'Users',
+      subtitle: 'Customer analytics',
       icon: Users,
-    },
-    {
-      id: 'transactions',
-      title: 'Transactions',
-      subtitle: 'Payment history',
-      icon: CreditCard,
     },
     {
       id: 'audits',
       title: 'Audit Activity',
-      subtitle: 'SEO crawling reports',
+      subtitle: 'SEO crawling telemetry',
       icon: Activity,
     },
     {
       id: 'ai_usage',
       title: 'AI Usage',
-      subtitle: 'Token & AI consumption',
+      subtitle: 'AI unit consumption',
       icon: Cpu,
+    },
+    {
+      id: 'credits',
+      title: 'Credit Report',
+      subtitle: 'Wallet credit balances',
+      icon: Coins,
     },
   ];
 
@@ -39,7 +39,7 @@ export default function ReportSelector({ selectedReport, onSelectReport }) {
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 font-sans text-left">
       {reportCards.map((rc) => {
         const Icon = rc.icon;
-        const isSelected = selectedReport === rc.id;
+        const isSelected = selectedReport === rc.id || (selectedReport === 'users' && rc.id === 'customers');
 
         return (
           <button

@@ -20,6 +20,7 @@ class Payment(models.Model):
         ('pending', 'Pending'),
         ('success', 'Success'),
         ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
     )
 
     user = models.ForeignKey(
@@ -33,10 +34,11 @@ class Payment(models.Model):
     gateway_order_id = models.CharField(max_length=255, blank=True, null=True)
     gateway_payment_id = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    failure_reason = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.amount} - {self.status}"
+        return f"{self.user.email} - ₹{self.amount} - {self.status}"
 
 
 class CreditTransaction(models.Model):
@@ -44,6 +46,7 @@ class CreditTransaction(models.Model):
         ('purchase', 'Purchase'),
         ('audit_deduction', 'Audit Deduction'),
         ('admin_adjustment', 'Admin Adjustment'),
+        ('refund', 'Refund'),
     )
 
     user = models.ForeignKey(
@@ -58,8 +61,7 @@ class CreditTransaction(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.transaction_type} - {self.amount}"
-    
-import secrets
+
 
 class APIKey(models.Model):
     user = models.OneToOneField(
@@ -71,8 +73,9 @@ class APIKey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.key[:10]}..."
+        return f"APIKey for {self.user.email}"
 
-    @staticmethod
-    def generate_key():
-        return secrets.token_hex(32)
+    @classmethod
+    def generate_key(cls):
+        import secrets
+        return f"ath_{secrets.token_hex(24)}"

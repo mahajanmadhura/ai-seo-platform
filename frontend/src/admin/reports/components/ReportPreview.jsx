@@ -68,6 +68,15 @@ export default function ReportPreview({
           { header: 'Estimated Cost' },
           { header: 'Timestamp' },
         ];
+      case 'credits':
+        return [
+          { header: 'Transaction ID' },
+          { header: 'Customer' },
+          { header: 'Operation' },
+          { header: 'Credits' },
+          { header: 'Description' },
+          { header: 'Date & Time' },
+        ];
       default:
         return [];
     }
@@ -80,7 +89,8 @@ export default function ReportPreview({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {Object.entries(reportData.summary).map(([key, val]) => {
             const labelStr = key.replace(/_/g, ' ');
-            const isCurrency = key.includes('revenue') || key.includes('cost') || key.includes('amount') || key.includes('value');
+            const isCreditMetric = key.includes('credit') || key.includes('balance') || selectedReport === 'credits';
+            const isCurrency = !isCreditMetric && (key.includes('revenue') || key.includes('cost') || (key.includes('amount') && selectedReport !== 'credits'));
             const valFormatted = isCurrency ? `₹${Number(val).toLocaleString('en-IN')}` : typeof val === 'number' ? val.toLocaleString() : String(val);
 
             return (
@@ -120,7 +130,8 @@ export default function ReportPreview({
             <>
               {Object.entries(row).map(([k, v], cellIdx) => {
                 const isStatus = k === 'status';
-                const isCurrency = k.includes('amount') || k.includes('cost') || k.includes('revenue');
+                const isCreditMetric = k.includes('credit') || selectedReport === 'credits';
+                const isCurrency = !isCreditMetric && (k === 'revenue' || k === 'cost' || (k === 'amount' && selectedReport !== 'credits'));
 
                 if (isStatus) {
                   return (
@@ -130,6 +141,13 @@ export default function ReportPreview({
                   );
                 }
 
+                let displayVal = String(v);
+                if (isCurrency && typeof v === 'number') {
+                  displayVal = `₹${v.toFixed(2)}`;
+                } else if (isCreditMetric && typeof v === 'number') {
+                  displayVal = `${v > 0 ? '+' : ''}${v}`;
+                }
+
                 return (
                   <td
                     key={cellIdx}
@@ -137,7 +155,7 @@ export default function ReportPreview({
                       cellIdx === 0 ? 'font-bold text-zinc-950' : 'text-zinc-600 font-mono'
                     }`}
                   >
-                    {isCurrency && typeof v === 'number' ? `₹${v.toFixed(2)}` : String(v)}
+                    {displayVal}
                   </td>
                 );
               })}

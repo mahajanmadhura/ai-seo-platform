@@ -2,48 +2,84 @@ import React from 'react';
 import { Filter, RefreshCw } from 'lucide-react';
 import AdminDropdown from '../../components/ui/AdminDropdown';
 
-export const REPORT_FILTER_CONFIG = {
+export const REPORT_CONFIG = {
   revenue: {
     showDateRange: true,
     showUserFilter: true,
     showStatusFilter: true,
-    showWebsiteFilter: true,
+    showGatewayFilter: true,
+    showWebsiteFilter: false,
+    statusOptions: [
+      { value: 'all', label: 'All Payment Statuses' },
+      { value: 'success', label: 'Success' },
+      { value: 'pending', label: 'Pending' },
+      { value: 'failed', label: 'Failed' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ],
+    gatewayOptions: [
+      { value: 'all', label: 'All Payment Methods' },
+      { value: 'online', label: 'Online Payment' },
+      { value: 'wallet', label: 'Wallet Credit' },
+      { value: 'manual', label: 'Manual Adjustment' },
+    ],
   },
   customers: {
     showDateRange: true,
-    showUserFilter: false, // Complete user list report
+    showUserFilter: false,
     showStatusFilter: true,
+    showGatewayFilter: false,
     showWebsiteFilter: false,
+    statusOptions: [
+      { value: 'all', label: 'All Account Statuses' },
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+      { value: 'verified', label: 'Verified' },
+      { value: 'unverified', label: 'Unverified' },
+    ],
   },
   users: {
     showDateRange: true,
     showUserFilter: false,
     showStatusFilter: true,
+    showGatewayFilter: false,
     showWebsiteFilter: false,
-  },
-  transactions: {
-    showDateRange: true,
-    showUserFilter: true,
-    showStatusFilter: true,
-    showWebsiteFilter: true,
+    statusOptions: [
+      { value: 'all', label: 'All Account Statuses' },
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+      { value: 'verified', label: 'Verified' },
+      { value: 'unverified', label: 'Unverified' },
+    ],
   },
   audits: {
     showDateRange: true,
     showUserFilter: false,
     showStatusFilter: true,
+    showGatewayFilter: false,
     showWebsiteFilter: true,
+    statusOptions: [
+      { value: 'all', label: 'All Audit Statuses' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'running', label: 'Running' },
+      { value: 'failed', label: 'Failed' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ],
   },
   ai_usage: {
     showDateRange: true,
     showUserFilter: true,
-    showStatusFilter: false, // Transaction status not applicable
+    showStatusFilter: false,
+    showGatewayFilter: false,
     showWebsiteFilter: true,
+    statusOptions: [],
   },
-  'ai-usage': {
+  credits: {
     showDateRange: true,
     showUserFilter: true,
     showStatusFilter: false,
+    showGatewayFilter: false,
     showWebsiteFilter: true,
+    statusOptions: [],
   },
 };
 
@@ -59,6 +95,8 @@ export default function ReportFilters({
   setUserFilter,
   statusFilter,
   setStatusFilter,
+  gatewayFilter,
+  setGatewayFilter,
   websiteFilter,
   setWebsiteFilter,
   usersList = [],
@@ -68,12 +106,7 @@ export default function ReportFilters({
 }) {
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const config = REPORT_FILTER_CONFIG[selectedReport] || {
-    showDateRange: true,
-    showUserFilter: true,
-    showStatusFilter: true,
-    showWebsiteFilter: true,
-  };
+  const config = REPORT_CONFIG[selectedReport] || REPORT_CONFIG.revenue;
 
   const dateRangeOptions = [
     { value: 'today', label: 'Today' },
@@ -88,13 +121,6 @@ export default function ReportFilters({
   const userOptions = [
     { value: 'all', label: 'All Customers' },
     ...usersList.map((u) => ({ value: String(u.id), label: u.email })),
-  ];
-
-  const statusOptions = [
-    { value: 'all', label: 'All Statuses' },
-    { value: 'active', label: 'Active / Success' },
-    { value: 'inactive', label: 'Inactive / Failed' },
-    { value: 'pending', label: 'Pending / Running' },
   ];
 
   const websiteOptions = [
@@ -170,7 +196,7 @@ export default function ReportFilters({
           </>
         )}
 
-        {/* User Filter Dropdown (Hidden for Users/Customers and Audits reports) */}
+        {/* Customer Filter Dropdown */}
         {config.showUserFilter && (
           <AdminDropdown
             label="Customer"
@@ -181,17 +207,27 @@ export default function ReportFilters({
           />
         )}
 
-        {/* Status Filter Dropdown (Hidden for AI Usage report) */}
+        {/* Status Filter Dropdown */}
         {config.showStatusFilter && (
           <AdminDropdown
             label="Status"
-            options={statusOptions}
+            options={config.statusOptions || []}
             value={statusFilter}
             onChange={setStatusFilter}
           />
         )}
 
-        {/* Website Filter Dropdown (Hidden for Users report) */}
+        {/* Payment Method Filter Dropdown */}
+        {config.showGatewayFilter && (
+          <AdminDropdown
+            label="Payment Method"
+            options={config.gatewayOptions || []}
+            value={gatewayFilter}
+            onChange={setGatewayFilter}
+          />
+        )}
+
+        {/* Website Filter Dropdown */}
         {config.showWebsiteFilter && (
           <AdminDropdown
             label="Website"

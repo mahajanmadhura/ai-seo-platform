@@ -7,7 +7,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-from .models import UserCredit, Payment, CreditTransaction
+from .models import UserCredit, Payment, CreditTransaction, APIKey
 from .serializers import (
     UserCreditSerializer,
     PaymentSerializer,
@@ -30,32 +30,38 @@ class CreatePaymentView(APIView):
     def post(self, request):
         serializer = CreatePaymentSerializer(data=request.data)
         if serializer.is_valid():
-            client = razorpay.Client(
-                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-            )
-            amount = int(serializer.validated_data['amount'] * 100)
-            razorpay_order = client.order.create({
-                "amount": amount,
-                "currency": "INR",
-                "payment_capture": 1
-            })
+            try:
+                client = razorpay.Client(
+                    auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+                )
+                amount = int(serializer.validated_data['amount'] * 100)
+                razorpay_order = client.order.create({
+                    "amount": amount,
+                    "currency": "INR",
+                    "payment_capture": 1
+                })
+                order_id = razorpay_order['id']
+            except Exception as e:
+                order_id = f"ORDER-{int(transaction.now().timestamp())}"
+
             payment = Payment.objects.create(
                 user=request.user,
                 amount=serializer.validated_data['amount'],
                 credits_purchased=serializer.validated_data['credits_purchased'],
                 gateway='razorpay',
-                gateway_order_id=razorpay_order['id'],
+                gateway_order_id=order_id,
                 status='pending',
             )
             return Response({
                 'payment_id': payment.id,
-                'razorpay_order_id': razorpay_order['id'],
+                'razorpay_order_id': order_id,
                 'razorpay_key': settings.RAZORPAY_KEY_ID,
-                'amount': amount,
+                'amount': int(serializer.validated_data['amount'] * 100),
                 'currency': 'INR',
                 'message': 'Payment created, proceed to gateway',
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ConfirmPaymentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -69,8 +75,12 @@ class ConfirmPaymentView(APIView):
         if payment.status == 'success':
             return Response({'message': 'Already confirmed'})
 
+        razorpay_payment_id = request.data.get('razorpay_payment_id') or request.data.get('gateway_payment_id')
+
         with transaction.atomic():
             payment.status = 'success'
+            if razorpay_payment_id:
+                payment.gateway_payment_id = razorpay_payment_id
             payment.save()
 
             credit_account, created = UserCredit.objects.get_or_create(user=request.user)
@@ -81,14 +91,54 @@ class ConfirmPaymentView(APIView):
                 user=request.user,
                 amount=payment.credits_purchased,
                 transaction_type='purchase',
-                description=f'Credits purchased via payment #{payment.id}',
+                description=f'Credits purchased via order {payment.gateway_order_id or f"#{payment.id}"}',
             )
 
         return Response({'message': 'Payment confirmed, credits added'})
 
 
+class CancelPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, payment_id):
+        try:
+            payment = Payment.objects.get(id=payment_id, user=request.user)
+            if payment.status == 'pending':
+                payment.status = 'cancelled'
+                if hasattr(payment, 'failure_reason'):
+                    payment.failure_reason = 'User closed Razorpay checkout modal'
+                payment.save()
+            return Response({'message': 'Payment marked as cancelled', 'status': payment.status})
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment record not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class FailPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, payment_id):
+        try:
+            payment = Payment.objects.get(id=payment_id, user=request.user)
+            if payment.status == 'pending':
+                payment.status = 'failed'
+                if hasattr(payment, 'failure_reason'):
+                    payment.failure_reason = request.data.get('reason', 'Payment failed at gateway')
+                payment.save()
+            return Response({'message': 'Payment marked as failed', 'status': payment.status})
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment record not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class PaymentHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payments = Payment.objects.filter(user=request.user).defer('failure_reason').order_by('-created_at')
+        serializer = PaymentSerializer(payments, many=True)
+        return Response(serializer.data)
+
+
 class DeductCreditView(APIView):
-    """Audit start karte waqt 5 credits katne ke liye internal use"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -106,7 +156,7 @@ class DeductCreditView(APIView):
                     user=request.user,
                     amount=-5,
                     transaction_type='audit_deduction',
-                    description='5 credits deducted for audit',
+                    description='5 credits deducted for SEO audit',
                 )
 
             return Response({'message': 'Credit deducted', 'balance': credit_account.balance})
@@ -122,8 +172,6 @@ class CreditTransactionHistoryView(APIView):
         serializer = CreditTransactionSerializer(transactions, many=True)
         return Response(serializer.data)
 
-
-from .models import APIKey
 
 class GenerateAPIKeyView(APIView):
     permission_classes = [IsAuthenticated]

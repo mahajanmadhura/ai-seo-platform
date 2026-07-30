@@ -11,10 +11,19 @@ export const getCreditBalance = async () => {
 
 export const getCreditTransactions = async () => {
   try {
-    const res = await api.get('/api/v1/payments/transactions/');
+    const res = await api.get('/api/v1/payments/ledger/');
     return { success: true, data: res.data };
   } catch (err) {
     return { success: false, message: err.response?.data?.error || 'Failed to load transaction history.' };
+  }
+};
+
+export const getPaymentHistory = async () => {
+  try {
+    const res = await api.get('/api/v1/payments/history/');
+    return { success: true, data: res.data };
+  } catch (err) {
+    return { success: false, message: err.response?.data?.error || 'Failed to load payment history.' };
   }
 };
 
@@ -30,12 +39,32 @@ export const createPaymentOrder = async (amount, creditsPurchased) => {
   }
 };
 
-export const confirmPayment = async (paymentId) => {
+export const confirmPayment = async (paymentId, gatewayPaymentId = null) => {
   try {
-    const res = await api.post(`/api/v1/payments/${paymentId}/confirm/`);
+    const res = await api.post(`/api/v1/payments/${paymentId}/confirm/`, {
+      razorpay_payment_id: gatewayPaymentId
+    });
     return { success: true, data: res.data };
   } catch (err) {
     return { success: false, message: err.response?.data?.message || 'Failed to confirm payment.' };
+  }
+};
+
+export const cancelPayment = async (paymentId) => {
+  try {
+    const res = await api.post(`/api/v1/payments/${paymentId}/cancel/`);
+    return { success: true, data: res.data };
+  } catch (err) {
+    return { success: false, message: err.response?.data?.message || 'Failed to cancel payment.' };
+  }
+};
+
+export const failPayment = async (paymentId, reason = 'Payment failed at gateway') => {
+  try {
+    const res = await api.post(`/api/v1/payments/${paymentId}/fail/`, { reason });
+    return { success: true, data: res.data };
+  } catch (err) {
+    return { success: false, message: err.response?.data?.message || 'Failed to record payment failure.' };
   }
 };
 
@@ -65,4 +94,3 @@ export const getAPIKey = async () => {
     return { success: false, message: err.response?.data?.error || 'Failed to load API key.' };
   }
 };
-

@@ -18,6 +18,7 @@ export default function ReportsPage() {
   const [endDate, setEndDate] = useState('');
   const [userFilter, setUserFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [gatewayFilter, setGatewayFilter] = useState('all');
   const [websiteFilter, setWebsiteFilter] = useState('all');
 
   // Directory Options for Dropdowns
@@ -62,13 +63,14 @@ export default function ReportsPage() {
         end_date: endDate,
         user_id: userFilter,
         status: statusFilter,
+        gateway: gatewayFilter,
         website_id: websiteFilter,
       };
       const res = await adminApi.getReportsData(params);
       setReportData(res.data || res);
       setLastRefreshed(new Date());
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to generate report data');
+      setError(err.response?.data?.message || err.message || 'Failed to load report data');
       addToast('Failed to load report data', 'error');
     } finally {
       setLoading(false);
@@ -82,7 +84,7 @@ export default function ReportsPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [selectedReport, dateRange, startDate, endDate, userFilter, statusFilter, websiteFilter]);
+  }, [selectedReport, dateRange, startDate, endDate, userFilter, statusFilter, gatewayFilter, websiteFilter]);
 
   // Handle Download Exports (PDF, Excel, JSON)
   const handleExport = async (format) => {
@@ -96,6 +98,7 @@ export default function ReportsPage() {
         end_date: endDate,
         user_id: userFilter,
         status: statusFilter,
+        gateway: gatewayFilter,
         website_id: websiteFilter,
       };
       await adminApi.downloadReportExport(params);
@@ -130,6 +133,7 @@ export default function ReportsPage() {
           // Reset specific filters when switching report category for clean UX
           setUserFilter('all');
           setStatusFilter('all');
+          setGatewayFilter('all');
           setWebsiteFilter('all');
         }}
       />
@@ -147,6 +151,8 @@ export default function ReportsPage() {
         setUserFilter={setUserFilter}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
+        gatewayFilter={gatewayFilter}
+        setGatewayFilter={setGatewayFilter}
         websiteFilter={websiteFilter}
         setWebsiteFilter={setWebsiteFilter}
         usersList={usersList}

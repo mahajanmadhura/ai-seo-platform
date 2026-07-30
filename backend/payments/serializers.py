@@ -31,11 +31,22 @@ class UserCreditSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    failure_reason = serializers.SerializerMethodField()
+
     class Meta:
         model = Payment
-        fields = ['id', 'amount', 'credits_purchased', 'gateway',
-                  'gateway_order_id', 'gateway_payment_id', 'status', 'created_at']
+        fields = [
+            'id', 'amount', 'credits_purchased', 'gateway',
+            'gateway_order_id', 'gateway_payment_id', 'status',
+            'failure_reason', 'created_at'
+        ]
         read_only_fields = ['id', 'status', 'created_at']
+
+    def get_failure_reason(self, obj):
+        try:
+            return getattr(obj, 'failure_reason', None)
+        except Exception:
+            return None
 
 
 class CreatePaymentSerializer(serializers.Serializer):

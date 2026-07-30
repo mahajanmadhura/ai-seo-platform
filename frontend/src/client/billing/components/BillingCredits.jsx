@@ -6,6 +6,8 @@ import {
   getCreditTransactions,
   createPaymentOrder,
   confirmPayment,
+  cancelPayment,
+  failPayment,
   generateAPIKey,
   revokeAPIKey,
   getAPIKey
@@ -35,7 +37,6 @@ export default function BillingCredits() {
   const { user, credits, refreshCredits } = useAuth();
   const { addToast } = useToast();
 
-  const [transactions, setTransactions] = useState([]);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
   const [customCredits, setCustomCredits] = useState(100);
@@ -53,12 +54,8 @@ export default function BillingCredits() {
       if (keyRes.success && keyRes.data) {
         setApiKey(keyRes.data.api_key || '');
       }
-      const txRes = await getCreditTransactions();
-      if (txRes.success && txRes.data) {
-        setTransactions(txRes.data || []);
-      }
     } catch (err) {
-      setBillingError('Failed to load billing history.');
+      setBillingError('Failed to load billing status.');
     } finally {
       setBillingLoading(false);
     }
@@ -66,7 +63,7 @@ export default function BillingCredits() {
 
   const handleRefresh = async () => {
     await fetchBillingData();
-    addToast('Billing records refreshed', 'info');
+    addToast('Billing status refreshed', 'info');
   };
 
   useEffect(() => {
@@ -77,7 +74,7 @@ export default function BillingCredits() {
     setProcessingPayment(true);
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded) {
-      addToast('Failed to load Razorpay script.', 'error');
+      addToast('Failed to load Razorpay checkout script.', 'error');
       setProcessingPayment(false);
       return;
     }
@@ -102,7 +99,7 @@ export default function BillingCredits() {
         handler: async function (response) {
           setProcessingPayment(true);
           try {
-            const verifyRes = await confirmPayment(payment_id);
+            const verifyRes = await confirmPayment(payment_id, response.razorpay_payment_id);
             if (verifyRes.success) {
               addToast(`Successfully credited ${creditsToBuy} credits!`, 'success');
               fetchBillingData();
@@ -123,14 +120,25 @@ export default function BillingCredits() {
           color: '#053D34'
         },
         modal: {
-          ondismiss: function () {
-            addToast('Payment cancelled.', 'info');
+          ondismiss: async function () {
+            await cancelPayment(payment_id);
+            addToast('Payment checkout cancelled.', 'info');
             setProcessingPayment(false);
+            fetchBillingData();
           }
         }
       };
 
       const rzpInstance = new window.Razorpay(options);
+
+      rzpInstance.on('payment.failed', async function (response) {
+        const errorDesc = response.error?.description || 'Gateway declined payment';
+        await failPayment(payment_id, errorDesc);
+        addToast(`Payment failed: ${errorDesc}`, 'error');
+        setProcessingPayment(false);
+        fetchBillingData();
+      });
+
       rzpInstance.open();
     } catch (err) {
       addToast('Error opening payments checkout.', 'error');
@@ -347,17 +355,17 @@ export default function BillingCredits() {
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color/60 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="space-y-1.5 text-left">
           <h3 className="font-black text-deep-green text-base tracking-tight flex items-center gap-2">
-            <FileText className="w-4.5 h-4.5 text-[#0B5A4A]" /> Transaction History
+            <FileText className="w-4.5 h-4.5 text-[#0B5A4A]" /> Billing & Ledger History
           </h3>
           <p className="text-xs text-muted-text font-semibold">
-            View purchases, audit deductions, and manual credit adjustments.
+            View financial payment history and credit wallet ledger logs.
           </p>
         </div>
         <button
           onClick={() => navigate('/settings/transactions')}
           className="bg-deep-green hover:bg-[#36E682] text-white hover:text-[#053D34] px-6 py-3 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md uppercase tracking-wider flex-shrink-0"
         >
-          View Transactions
+          View Billing History
         </button>
       </div>
     </div>
