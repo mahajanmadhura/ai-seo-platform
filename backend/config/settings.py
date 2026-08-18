@@ -95,6 +95,24 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 import socket
 
+# ==================================
+# DATABASE CONFIGURATION
+# ==================================
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+USE_SQLITE = os.getenv('USE_SQLITE', 'False').lower() in ('true', '1', 'yes')
+
+# Fallback individual database environment variables (Render defaults)
+DB_NAME = os.getenv('DB_NAME', 'ai_seo_db_kz3j')
+DB_USER = os.getenv('DB_USER', 'ai_seo_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+DB_HOST = os.getenv('DB_HOST', 'dpg-da24algu01pc73dqtk2g-a')
+DB_PORT = os.getenv('DB_PORT', '5432')
+
 def check_postgres_connection(host, port):
     try:
         with socket.create_connection((host, int(port)), timeout=0.5):
@@ -102,14 +120,15 @@ def check_postgres_connection(host, port):
     except OSError:
         return False
 
-DB_NAME = os.getenv('DB_NAME', 'seo_db')
-DB_USER = os.getenv('DB_USER', 'seo_user')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'seo_pass')
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = os.getenv('DB_PORT', '5432')
-USE_SQLITE = os.getenv('USE_SQLITE', 'True').lower() in ('true', '1', 'yes')
-
-if not USE_SQLITE and check_postgres_connection(DB_HOST, DB_PORT):
+if DATABASE_URL and dj_database_url:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=False
+        )
+    }
+elif not USE_SQLITE and (DB_PASSWORD or check_postgres_connection(DB_HOST, DB_PORT)):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -118,6 +137,7 @@ if not USE_SQLITE and check_postgres_connection(DB_HOST, DB_PORT):
             'PASSWORD': DB_PASSWORD,
             'HOST': DB_HOST,
             'PORT': DB_PORT,
+            'CONN_MAX_AGE': 600,
         }
     }
 else:
@@ -127,6 +147,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
 AUTH_USER_MODEL = 'accounts.User'
 
 # ==================================
@@ -139,11 +160,19 @@ REST_FRAMEWORK = {
 }
 
 # ==================================
-# CELERY (optional)
+# REDIS & CELERY & CACHES (RENDER / LOCAL)
 # ==================================
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+DEFAULT_RENDER_REDIS_HOST = "red-da24bcn40ujc73956lhg"
+DEFAULT_RENDER_REDIS_URL = f"redis://{DEFAULT_RENDER_REDIS_HOST}:6379"
 
-# Force Redis client to use RESP2 (protocol 2) since local Redis server might be older version (e.g. on Windows)
+REDIS_HOST = os.getenv('REDIS_HOST', DEFAULT_RENDER_REDIS_HOST)
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_URL = os.getenv('REDIS_URL', DEFAULT_RENDER_REDIS_URL)
+
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/0"))
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('REDIS_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/0"))
+
+# Force Redis client to use RESP2 (protocol 2) since local Redis server or cloud proxy might require protocol 2
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'client_kwargs': {
         'protocol': 2
@@ -151,11 +180,28 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 }
 
 # Where Celery should store the results of the tasks once they are done
-CELERY_RESULT_BACKEND = 'django-db'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+# Django Channels WebSockets
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL] if REDIS_URL else [(REDIS_HOST, int(REDIS_PORT))],
+        },
+    },
+}
+
+# Django Cache Configuration using Redis
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.PyRedisCache",
+        "LOCATION": os.getenv("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/1"),
+    }
+}
 
 # ==================================
 # STATIC & WHITENOISE
@@ -196,26 +242,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")  # Your Brevo login email
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")  # SMTP key, not API key
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
-
-
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
 
 
 from datetime import timedelta
