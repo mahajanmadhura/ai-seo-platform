@@ -27,8 +27,11 @@ frontend/*.log
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
-frontend/pnpm-debug.log*
 frontend/lerna-debug.log*
+frontend/latest_html.json
+*.tmp
+*.bak
+*.scratch
 
 # ------------------------------------------
 # Backend Ignores
@@ -65,8 +68,8 @@ backend/*.sqlite3
 backend/static/
 backend/media/
 backend/uploads/
-backend/reports/
 backend/reports/pdfs/
+backend/reports/exports/
 backend/audits/reports/
 media/
 **/media/

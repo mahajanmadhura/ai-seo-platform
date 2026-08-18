@@ -1,21 +1,35 @@
-# Environments
+# Environments & Secrets
 venv/
+.venv/
 env/
 .env
+.env.*
+!.env.example
 
 # Python Cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Database (Do not push local test databases!)
+# Database (Do not push local databases!)
 db.sqlite3
 db.sqlite
 *.sqlite
 *.sqlite3
 
-# Celery
+# Media & Generated Reports
+media/
+reports/pdfs/
+reports/exports/
+audits/reports/
+*.pdf
+
+# Celery & Background Processes
 celerybeat-schedule
 *.pid
 
 # Logs
 *.log
+logs/
+.pytest_cache/

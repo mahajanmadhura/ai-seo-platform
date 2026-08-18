@@ -19,7 +19,7 @@ class LLMRequestLog(models.Model):
 
     @property
     def cost_estimate(self):
-        # 2026 Groq Llama 3.3 70B Pricing Calculation
+        # Groq GPT-OSS 120B Pricing Calculation
         # Input: $0.59 / 1M tokens | Output: $0.79 / 1M tokens
         input_cost = (self.prompt_tokens / 1_000_000) * 0.59
         output_cost = (self.completion_tokens / 1_000_000) * 0.79

@@ -152,11 +152,10 @@ export default function Transactions() {
         <div className="flex border-b border-border-color/50 gap-2">
           <button
             onClick={() => setActiveTab('payments')}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-wider cursor-pointer transition-all border-b-2 ${
-              activeTab === 'payments'
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-wider cursor-pointer transition-all border-b-2 ${activeTab === 'payments'
                 ? 'border-deep-green text-deep-green bg-deep-green/5 rounded-t-xl'
                 : 'border-transparent text-muted-text hover:text-deep-green'
-            }`}
+              }`}
           >
             <CreditCard className="w-4 h-4" />
             Payment History ({payments.length})
@@ -164,11 +163,10 @@ export default function Transactions() {
 
           <button
             onClick={() => setActiveTab('ledger')}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-wider cursor-pointer transition-all border-b-2 ${
-              activeTab === 'ledger'
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-wider cursor-pointer transition-all border-b-2 ${activeTab === 'ledger'
                 ? 'border-deep-green text-deep-green bg-deep-green/5 rounded-t-xl'
                 : 'border-transparent text-muted-text hover:text-deep-green'
-            }`}
+              }`}
           >
             <Coins className="w-4 h-4" />
             Credit Ledger ({ledger.length})
@@ -217,11 +215,10 @@ export default function Transactions() {
                     <button
                       key={st}
                       onClick={() => setPaymentFilter(st)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all ${
-                        paymentFilter === st
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all ${paymentFilter === st
                           ? 'bg-deep-green text-white shadow-sm'
                           : 'text-muted-text hover:text-deep-green'
-                      }`}
+                        }`}
                     >
                       {st}
                     </button>
@@ -250,7 +247,6 @@ export default function Transactions() {
                         <th className="py-3.5">Order ID</th>
                         <th className="py-3.5">Payment ID</th>
                         <th className="py-3.5 text-right">Amount (₹)</th>
-                        <th className="py-3.5">Gateway</th>
                         <th className="py-3.5 text-right pr-6">Status</th>
                       </tr>
                     </thead>
@@ -269,9 +265,7 @@ export default function Transactions() {
                           <td className="py-4 text-right font-black text-deep-green whitespace-nowrap">
                             ₹{Number(p.amount).toFixed(2)}
                           </td>
-                          <td className="py-4 font-sans font-bold text-zinc-700 uppercase whitespace-nowrap">
-                            Razorpay
-                          </td>
+
                           <td className="py-4 text-right pr-6 whitespace-nowrap">
                             {renderStatusBadge(p.status)}
                           </td>
@@ -327,11 +321,10 @@ export default function Transactions() {
                     <button
                       key={type}
                       onClick={() => setLedgerFilter(type)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all ${
-                        ledgerFilter === type
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all ${ledgerFilter === type
                           ? 'bg-deep-green text-white shadow-sm'
                           : 'text-muted-text hover:text-deep-green'
-                      }`}
+                        }`}
                     >
                       {type.replace('_', ' ')}
                     </button>
@@ -371,13 +364,12 @@ export default function Transactions() {
                               {tx.created_at ? new Date(tx.created_at).toLocaleString() : 'N/A'}
                             </td>
                             <td className="py-4 font-sans text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
-                              <span className={`px-2.5 py-1 rounded-full ${
-                                tx.transaction_type === 'purchase'
+                              <span className={`px-2.5 py-1 rounded-full ${tx.transaction_type === 'purchase'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : tx.transaction_type === 'audit_deduction'
-                                  ? 'bg-red-50 text-red-700 border border-red-200'
-                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
-                              }`}>
+                                    ? 'bg-red-50 text-red-700 border border-red-200'
+                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                }`}>
                                 {tx.transaction_type.replace('_', ' ')}
                               </span>
                             </td>

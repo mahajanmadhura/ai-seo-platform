@@ -1,5 +1,6 @@
 from groq import Groq
 import os
+from django.conf import settings
 from dotenv import load_dotenv
 from .models import Audit,CrawledPage,SEOIssues
 from django.db.models import Q
@@ -117,15 +118,18 @@ def generate_ai_recommendations(audit):
     for issue in list_of_issues:
         print(issue)
 
+    groq_api_key = getattr(settings, "GROQ_API_KEY", None) or os.environ.get("GROQ_API_KEY")
+    groq_model = getattr(settings, "GROQ_MODEL", None) or os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+
     client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
+        api_key=groq_api_key,
     )
 
     chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "user",
-                "content":f"""
+                "content": f"""
                     You are an expert Technical SEO Analyst. 
                     I just audited a website and found these issues:
                     {list_of_issues}
@@ -135,7 +139,7 @@ def generate_ai_recommendations(audit):
                 """,
             }
         ],
-        model="llama-3.3-70b-versatile",
+        model=groq_model,
     )
 
     print(chat_completion.choices[0].message.content)
