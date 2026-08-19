@@ -1,0 +1,56 @@
+celery -A config worker --pool=threads --concurrency=10 -l info 
+
+
+import requests
+response = requests.post(
+    "http://127.0.0.1:8000/api/v1/audits/start/", 
+    json={"website_id": 3, "target_keyword": "code"} 
+)
+
+print(response.json())
+
+
+## Real gaps against the spec
+
+**Crawler config (Section 10) not actually enforced:**
+- `request_timeout: 30` — the main `requests.get(url, ...)` call in `fetch_url` has **no timeout at all**, so a slow/hanging page can stall the whole audit
+- `max_redirects: 5` — not set; `requests` uses its own default
+- `allowed_extensions` filter — not implemented, so the crawler can wander into PDFs/images/etc. and waste crawl budget
+- Sitemap.xml parsing for priority URLs — crawler is pure link-discovery BFS; sitemap is only checked for existence, never parsed
+- Resume capability for interrupted crawls — `visited_urls`/`urls_to_visit` are local Python variables with no persistence, so a Celery worker restart loses all crawl state
+- Optional Playwright/JS rendering — not present (spec marks it optional, so lower priority)
+
+**Model fields defined but never populated:**
+- `Audit.overall_Score` — never calculated anywhere. The PDF report spec explicitly shows "Overall SEO Score: 68/100" combining on-page + performance + mobile + security — you have no function that rolls these up
+- `CrawledPage.technical_score` — no `calculate_technical_score()` exists (you have on-page and performance scores, but technical checks like robots/sitemap/schema/hreflang/redirects aren't scored, just logged as issues)
+- `CrawledPage.status_code404` — never set (redundant with `status_code` but the boolean flag is dead)
+- `CrawledPage.mobile_font_readability` / `mobile_tap_targets` — `core_web_vitals_analysis` computes these but only uses them to raise issues; it never saves them onto the page object
+
+**On-page checks that are partial vs. spec:**
+- Title/H1 "uniqueness" (spec explicitly calls this out) — not checked across pages in an audit
+- H1 length constraint — not checked
+- Meta description "call-to-action" analysis — not implemented at all
+- Image alt "descriptiveness/keyword" — you only check presence, not whether alt text is meaningful or keyword-relevant
+- Canonical "self-referencing" check — you check existence only, not whether it points to itself correctly
+- URL structure "lowercase, hyphens" — only length is checked
+
+**Technical SEO partial:**
+- Redirect **loop** detection — you count chain length but don't detect actual loops
+- Soft 404 detection — not implemented
+- Structured data **validation** — you check for `<script type="application/ld+json">` presence, not whether it's valid/correct schema
+- hreflang **validation** (correct language codes, reciprocal return tags) — presence only
+- x-robots-tag header check — spec lists this under crawlability; you only check the meta-robots tag, not the HTTP header
+
+**Link analysis partial:**
+- Sponsored/UGC `rel` attribute analysis — spec explicitly lists this; you capture `rel` but never check for `sponsored`/`ugc` values
+- External link "quality" — only counted, not analyzed
+- Broken link detection capped at 10 per page (`if len(broken_links)<10`) — intentional but worth flagging since spec doesn't mention this cap
+
+**AI recommendation format mismatch:**
+Spec section 7 defines a structured JSON output (`seo_score`, `summary`, `critical_issues[]` with impact/fix/priority, `recommendations[]`, `quick_wins[]`). Your `generate_ai_recommendations` asks the model for a 2-sentence freeform paragraph and stores it in a `TextField`. This won't feed a dashboard or PDF template the way the spec's report structure expects — you'd need structured JSON output and probably a JSONField.
+
+**Scoring model inconsistency:**
+Your `calculate_on_page_score` maxes out around 90 points, not 100, even though weights roughly track the spec's percentages (15/10/10/5/8/12/8/7/3/12). Worth normalizing so scores are genuinely out of 100.
+
+**Issue prioritization:**
+Spec's AI engine module wants issues classified Critical/High/Medium/Low. Your `SEOIssues.issue_type` only has ERROR/WARNING/NOTICE — no severity/priority field to drive that classification.

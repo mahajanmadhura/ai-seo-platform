@@ -119,7 +119,6 @@ def check_postgres_connection(host, port):
             return True
     except OSError:
         return False
-
 if DATABASE_URL and dj_database_url:
     DATABASES = {
         'default': dj_database_url.config(
@@ -159,49 +158,28 @@ REST_FRAMEWORK = {
     )
 }
 
-# ==================================
-# REDIS & CELERY & CACHES (RENDER / LOCAL)
-# ==================================
-DEFAULT_RENDER_REDIS_HOST = "red-da24bcn40ujc73956lhg"
-DEFAULT_RENDER_REDIS_URL = f"redis://{DEFAULT_RENDER_REDIS_HOST}:6379"
-
-REDIS_HOST = os.getenv('REDIS_HOST', DEFAULT_RENDER_REDIS_HOST)
-REDIS_PORT = os.getenv('REDIS_PORT', '6379')
-REDIS_URL = os.getenv('REDIS_URL', DEFAULT_RENDER_REDIS_URL)
-
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/0"))
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('REDIS_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/0"))
-
-# Force Redis client to use RESP2 (protocol 2) since local Redis server or cloud proxy might require protocol 2
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'client_kwargs': {
-        'protocol': 2
-    }
-}
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
 
 # Where Celery should store the results of the tasks once they are done
+CELERY_RESULT_BACKEND = 'django-db'
+TIME_ZONE = 'UTC'
+# Accept content in JSON format
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
+CELERY_TIMEZONE = TIME_ZONE
 
 # Django Channels WebSockets
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL] if REDIS_URL else [(REDIS_HOST, int(REDIS_PORT))],
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
 
-# Django Cache Configuration using Redis
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.PyRedisCache",
-        "LOCATION": os.getenv("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/1"),
-    }
-}
+
 
 # ==================================
 # STATIC & WHITENOISE
