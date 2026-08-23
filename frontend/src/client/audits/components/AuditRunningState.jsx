@@ -41,26 +41,35 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
     return new Date(dateObj).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Estimate remaining seconds based on progress rate
+  const metadata = processStatus?.metadata || {};
+
+  // Use the worker's measured queue estimate and count it down between polls.
   const estimatedRemainingSeconds = useMemo(() => {
-    if (baseProgress <= 5 || secondsElapsed < 5) return 120;
-    const remainingPercent = 100 - baseProgress;
-    const secondsPerPercent = secondsElapsed / baseProgress;
-    return Math.max(5, Math.round(remainingPercent * secondsPerPercent));
-  }, [baseProgress, secondsElapsed]);
+    const workerEstimate = Number(metadata.estimated_remaining_seconds);
+    if (Number.isFinite(workerEstimate)) {
+      const statusAge = processStatus?.updated_at
+        ? Math.max(0, Math.floor((Date.now() - new Date(processStatus.updated_at).getTime()) / 1000))
+        : 0;
+      return Math.max(0, Math.round(workerEstimate - statusAge));
+    }
+    return baseProgress >= 100 ? 0 : 120;
+  }, [baseProgress, metadata, processStatus, secondsElapsed]);
 
   const startedAtDate = audit?.started_at ? new Date(audit.started_at) : new Date();
 
   // REAL DATA Metrics extraction & calculation (No hardcoded fake totals)
-  const metadata = processStatus?.metadata || {};
-  const totalPages = audit?.total_pages || audit?.crawled_pages_count || metadata.total_pages || 10;
+  const hasDiscoveredTotal = Number.isFinite(Number(metadata.total_pages)) && Number(metadata.total_pages) > 0;
+  const totalPages = hasDiscoveredTotal
+    ? Number(metadata.total_pages)
+    : (audit?.total_pages || audit?.crawled_pages_count || 1);
   const pagesCrawled = metadata.pages_crawled !== undefined 
     ? metadata.pages_crawled 
-    : Math.min(totalPages, Math.max(1, Math.round((baseProgress / 100) * totalPages)));
+    : Math.min(totalPages, Math.max(0, audit?.total_pages || 0));
   const pagesRemaining = Math.max(0, totalPages - pagesCrawled);
 
   // Currently Analyzing Path
   const currentAnalyzingPath = useMemo(() => {
+    if (metadata.current_url) return metadata.current_url;
     if (baseProgress <= 15) return '/';
     if (baseProgress <= 30) return '/robots.txt';
     if (baseProgress <= 45) return '/sitemap.xml';
@@ -68,7 +77,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
     if (baseProgress <= 75) return '/blog/technical-seo';
     if (baseProgress <= 90) return '/about-us';
     return '/contact';
-  }, [baseProgress]);
+  }, [baseProgress, metadata.current_url]);
 
   // Horizontal Pipeline Stages
   const pipelineStages = useMemo(() => [
@@ -183,7 +192,11 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
         {/* Animated Progress Bar with Continuous Shimmer */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[11px] font-bold text-deep-green">
-            <span>Progress Status: {pagesCrawled} / {totalPages} Pages</span>
+            <span>
+              {hasDiscoveredTotal
+                ? `Progress Status: ${pagesCrawled} / ${totalPages} Pages`
+                : 'Progress Status: Discovering pages...'}
+            </span>
             <span className="text-muted-text font-semibold">ETA: ~{formatDuration(estimatedRemainingSeconds)}</span>
           </div>
           <div className="w-full bg-soft-bg rounded-full h-2.5 overflow-hidden border border-border-color/40 relative">
@@ -252,7 +265,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
           <div className="md:col-span-7 flex flex-col justify-center relative">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-black uppercase text-muted-text tracking-wider">
-                Discovered URL Matrix ({pagesCrawled} / {totalPages} Pages Crawled)
+                Discovered URL Matrix ({hasDiscoveredTotal ? `${pagesCrawled} / ${totalPages} Pages Crawled` : 'Discovering pages'})
               </span>
               <div className="flex items-center gap-3 text-[8.5px] font-black text-deep-green">
                 <span className="flex items-center gap-1">
@@ -318,7 +331,9 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
             <div className="space-y-2 text-xs font-semibold text-deep-green">
               <div className="flex items-center justify-between p-2 rounded-xl bg-soft-bg border border-border-color/40">
                 <span className="text-muted-text">Pages Crawled</span>
-                <span className="font-black text-deep-green">{pagesCrawled} / {totalPages}</span>
+                <span className="font-black text-deep-green">
+                  {hasDiscoveredTotal ? `${pagesCrawled} / ${totalPages}` : `${pagesCrawled} crawled`}
+                </span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-xl bg-soft-bg border border-border-color/40 min-w-0">
@@ -354,7 +369,7 @@ export default function AuditRunningState({ audit, secondsElapsed, processStatus
               Status: <strong className="text-emerald-700">Active</strong>
             </span>
             <span className="bg-soft-bg px-2.5 py-1 rounded-lg border border-border-color/40 text-deep-green">
-              Pending: <strong className="text-deep-green">{pagesRemaining} URLs</strong>
+              Pending: <strong className="text-deep-green">{hasDiscoveredTotal ? `${pagesRemaining} URLs` : 'Discovering URLs'}</strong>
             </span>
             <span className="bg-soft-bg px-2.5 py-1 rounded-lg border border-border-color/40 text-deep-green">
               Success Rate: <strong className="text-emerald-700">98.7%</strong>

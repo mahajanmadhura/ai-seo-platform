@@ -10,7 +10,7 @@ load_dotenv(dotenv_path=BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
