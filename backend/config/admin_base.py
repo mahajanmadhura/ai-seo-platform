@@ -1,8 +1,18 @@
 # backend/config/admin_base.py
 from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import BasePermission, IsAdminUser
+from rest_framework.permissions import BasePermission
 from payments.pagination import AdminStandardPagination
+
+
+class IsAdminUser(BasePermission):
+    """Allow staff users and superusers to use the application admin APIs."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
 
 
 class IsSuperUser(BasePermission):

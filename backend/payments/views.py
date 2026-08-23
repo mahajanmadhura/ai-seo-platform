@@ -3,6 +3,7 @@ from rest_framework.response import Response
 
 import razorpay
 from django.conf import settings
+from django.utils import timezone
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -41,8 +42,8 @@ class CreatePaymentView(APIView):
                     "payment_capture": 1
                 })
                 order_id = razorpay_order['id']
-            except Exception as e:
-                order_id = f"ORDER-{int(transaction.now().timestamp())}"
+            except Exception:
+                order_id = f"ORDER-{int(timezone.now().timestamp())}"
 
             payment = Payment.objects.create(
                 user=request.user,

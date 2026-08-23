@@ -53,7 +53,13 @@ def start_audit(request):
                 status="PENDING",
                 current_step="QUEUED",
                 message="Queued",
-                progress_percent=5
+                progress_percent=5,
+                metadata={
+                    "pages_crawled": 0,
+                    "pages_queued": 1,
+                    "total_pages": None,
+                    "discovery_in_progress": True,
+                }
             )
             
             task_result = run_seo_audit.delay(new_audit.id)

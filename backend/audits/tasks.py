@@ -1,7 +1,7 @@
 from celery import shared_task, chord
 from celery.exceptions import Retry
 from .models import Audit,CrawledPage,SEOIssues, Link
-from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension, is_soft_404
+from .crawler import fetch_url, parse_html, check_technical_files, fetch_core_web_vitals, is_disallowed, get_robots_parser, HEADERS, parse_sitemap, is_allowed_extension, is_soft_404, normalize_crawl_url
 from .analysers import calculate_on_page_score,calculate_performance_score,generate_ai_recommendations, performance_analysis, analyze_link_profile, calculate_technical_score, calculate_overall_score, analyze_content_uniqueness, analyze_hreflang_reciprocity
 import traceback
 from django.utils import timezone
@@ -75,9 +75,10 @@ def _execute_seo_audit(self, audit_id):
     else:
         audit_website.status = "RUNNING"
         audit_website.save()
-        urls_to_visit = [(audit_website.website.url, 0)]  # (url, depth) — homepage is depth 0
+        start_url = normalize_crawl_url(audit_website.website.url)
+        urls_to_visit = [(start_url, 0)]  # (url, depth) — homepage is depth 0
         visited_urls = set()
-        queued_urls = {audit_website.website.url}
+        queued_urls = {start_url}
 
     print(f"We are going to audit the website with id {audit_id}")
 
@@ -123,7 +124,6 @@ def _execute_seo_audit(self, audit_id):
             return f"Audit {audit_id} skipped — site appears to be client-side rendered"
 
         robots, sitemap = check_technical_files(audit_website.website.url)
-        robots, sitemap = check_technical_files(audit_website.website.url)
         audit_website.has_robots = robots
         audit_website.has_sitemap = sitemap
         audit_website.save()
@@ -144,17 +144,18 @@ def _execute_seo_audit(self, audit_id):
         if sitemap:
             sitemap_urls = parse_sitemap(audit_website.website.url)
             for sitemap_url in sitemap_urls:
-                if (sitemap_url not in queued_urls
+                sitemap_url = normalize_crawl_url(sitemap_url)
+                if (sitemap_url and sitemap_url not in queued_urls
                     and not is_disallowed(sitemap_url)
                     and is_allowed_extension(sitemap_url)
                     and robots_parser.can_fetch(HEADERS["User-Agent"], sitemap_url)):
                     urls_to_visit.append((sitemap_url, 0))
                     queued_urls.add(sitemap_url)
 
-    CONCURRENT_REQUESTS = 15
     MAX_DEPTH = 5  
     try:
-        MAX_PAGES = 10
+        MAX_PAGES = 500
+        CONCURRENT_REQUESTS = min(15, MAX_PAGES)
         while urls_to_visit and len(visited_urls) < MAX_PAGES:
             batch = []
             while urls_to_visit and len(batch) < CONCURRENT_REQUESTS and len(visited_urls) < MAX_PAGES:
@@ -186,18 +187,33 @@ def _execute_seo_audit(self, audit_id):
                             urls_to_visit.append((link, depth + 1))
                             queued_urls.add(link)
 
-            send_progress(audit_id, {"pages_crawled": len(visited_urls)})
+            queued_count = min(MAX_PAGES, len(visited_urls) + len(urls_to_visit)) - len(visited_urls)
+            send_progress(audit_id, {
+                "pages_crawled": len(visited_urls),
+                "pages_queued": queued_count,
+                "total_pages": len(visited_urls) + queued_count,
+                "current_url": batch[-1][0]
+            })
 
             from process_status.services import update_process_status
             current_pages = len(visited_urls)
             crawl_progress = 15 + int((current_pages / MAX_PAGES) * 54)  # Scales from 15% to 69%
+            elapsed_seconds = max(1, (timezone.now() - audit_website.started_at).total_seconds())
+            estimated_remaining = round((queued_count * elapsed_seconds) / current_pages)
             update_process_status(
                 process_type="audit",
                 object_id=audit_id,
                 status="RUNNING",
                 current_step="CRAWLING",
                 message=f"Crawling pages ({current_pages}/{MAX_PAGES})",
-                progress_percent=crawl_progress
+                progress_percent=crawl_progress,
+                metadata={
+                    "pages_crawled": current_pages,
+                    "pages_queued": queued_count,
+                    "total_pages": current_pages + queued_count,
+                    "current_url": batch[-1][0],
+                    "estimated_remaining_seconds": estimated_remaining
+                }
             )
 
     except Exception as e:

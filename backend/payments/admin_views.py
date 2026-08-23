@@ -4,7 +4,6 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
 from django.db import transaction
 from django.db.models import Sum, Count, Avg, Q, Max
 from django.contrib.auth import get_user_model
@@ -15,7 +14,7 @@ from websites.models import Website
 from ai_engine.models import AIRecommendation as AdminAIRecommendation, LLMRequestLog
 from ai_recommendations.models import AIRecommendation as UserAIRecommendation
 from .serializers import AdminUserOverviewSerializer, AdminCreditAdjustmentSerializer, CreditTransactionSerializer
-from config.admin_base import AdminBaseListAPIView, StandardizedResponseMixin
+from config.admin_base import AdminBaseListAPIView, IsAdminUser, StandardizedResponseMixin
 
 User = get_user_model()
 

@@ -1,8 +1,8 @@
 # accounts/admin_views.py
 from rest_framework import generics
-from rest_framework.permissions import IsAdminUser
 from django.contrib.auth import get_user_model
 from .serializers import AdminRoleUpdateSerializer
+from config.admin_base import IsAdminUser
 
 User = get_user_model()
 

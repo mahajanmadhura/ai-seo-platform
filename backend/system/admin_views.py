@@ -8,14 +8,13 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
 from celery import current_app
 
 from audits.models import Audit, CrawledPage
 from process_status.models import ProcessStatus
 from .models import ErrorLog
 from .serializers import ErrorLogSerializer
-from config.admin_base import AdminBaseListAPIView, StandardizedResponseMixin
+from config.admin_base import AdminBaseListAPIView, IsAdminUser, StandardizedResponseMixin
 
 
 class CrawlerQueueStatsView(StandardizedResponseMixin, APIView):

@@ -2,12 +2,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
 from django.db.models import Count, Sum, Avg
 
 from .models import AIRecommendation as AdminAIRecommendation, LLMRequestLog
 from ai_recommendations.models import AIRecommendation as UserAIRecommendation
-from config.admin_base import StandardizedResponseMixin, IsSuperUser
+from config.admin_base import IsAdminUser, IsSuperUser, StandardizedResponseMixin
 
 
 class AIRecommendationStatsView(StandardizedResponseMixin, APIView):

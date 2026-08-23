@@ -103,31 +103,24 @@ try:
 except ImportError:
     dj_database_url = None
 
-DATABASE_URL = os.getenv('DATABASE_URL')
-USE_SQLITE = os.getenv('USE_SQLITE', 'False').lower() in ('true', '1', 'yes')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://seo_user:seo_pass@localhost:5432/seo_db')
 
-# Fallback individual database environment variables (Render defaults)
-DB_NAME = os.getenv('DB_NAME', 'ai_seo_db_kz3j')
-DB_USER = os.getenv('DB_USER', 'ai_seo_user')
-DB_PASSWORD = os.getenv('DB_PASSWORD', '')
-DB_HOST = os.getenv('DB_HOST', 'dpg-da24algu01pc73dqtk2g-a')
+# Local Docker Postgres defaults. Override with your hosted DB env vars if needed.
+DB_NAME = os.getenv('DB_NAME', 'seo_db')
+DB_USER = os.getenv('DB_USER', 'seo_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'seo_pass')
+DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '5432')
 
-def check_postgres_connection(host, port):
-    try:
-        with socket.create_connection((host, int(port)), timeout=0.5):
-            return True
-    except OSError:
-        return False
 if DATABASE_URL and dj_database_url:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
-            ssl_require=False
+            ssl_require=False,
         )
     }
-elif not USE_SQLITE and (DB_PASSWORD or check_postgres_connection(DB_HOST, DB_PORT)):
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -137,13 +130,6 @@ elif not USE_SQLITE and (DB_PASSWORD or check_postgres_connection(DB_HOST, DB_PO
             'HOST': DB_HOST,
             'PORT': DB_PORT,
             'CONN_MAX_AGE': 600,
-        }
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 

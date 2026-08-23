@@ -132,6 +132,27 @@ def is_disallowed(url):
     path = urlparse(url).path.lower()
     return any(path == blocked or path.startswith(blocked + "/") for blocked in DISALLOWED_PATHS)
 
+def normalize_crawl_url(url, base_url=None):
+    resolved_url = urljoin(base_url, url) if base_url else url
+    parsed = urlparse(resolved_url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return None
+
+    hostname = parsed.hostname.lower()
+    netloc = hostname
+    if parsed.port:
+        netloc = f"{hostname}:{parsed.port}"
+    return parsed._replace(
+        netloc=netloc,
+        path=parsed.path or "/",
+        fragment="",
+    ).geturl()
+
+def is_same_site(first_url, second_url):
+    first_host = (urlparse(first_url).hostname or "").lower().removeprefix("www.")
+    second_host = (urlparse(second_url).hostname or "").lower().removeprefix("www.")
+    return bool(first_host and first_host == second_host)
+
 def is_allowed_extension(url):
     path = urlparse(url).path.lower()
     if path == "" or path.endswith("/"):
@@ -152,7 +173,6 @@ def detect_redirect_loop(response):
 
 
 def fetch_url(url):
-    time.sleep(0.5)
     start_time = time.perf_counter()
 
     try:
@@ -286,6 +306,7 @@ def parse_html(html_txt,base_url,key_word):
     external_links=[]
     broken_links=[]
     all_links=[]
+    checked_link_count = 0
 
     if len(anchor_tags)!=0:
         for anchor_tag in anchor_tags:
@@ -293,8 +314,11 @@ def parse_html(html_txt,base_url,key_word):
             if not href:
                 continue
 
-            full_link=urljoin(base_url,href)
-            is_internal = urlparse(base_url).netloc==urlparse(full_link).netloc
+            full_link = normalize_crawl_url(href, base_url)
+            if not full_link:
+                continue
+
+            is_internal = is_same_site(base_url, full_link)
             anchor_text = anchor_tag.text.strip() if anchor_tag.text else ""
             rel = " ".join(anchor_tag.get("rel", [])) if anchor_tag.get("rel") else ""
 
@@ -308,7 +332,8 @@ def parse_html(html_txt,base_url,key_word):
             redirects = False
             redirect_target = None
 
-            if len(broken_links) < MAX_BROKEN_LINK_CHECKS_PER_PAGE:
+            if checked_link_count < MAX_BROKEN_LINK_CHECKS_PER_PAGE:
+                checked_link_count += 1
                 try:
                     resp = requests.head(full_link, timeout=2, verify=False, allow_redirects=False, headers=HEADERS)
                     status_code = resp.status_code
