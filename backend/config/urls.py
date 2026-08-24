@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.urls import re_path
 from django.conf.urls.static import static
 from payments.admin_views import (
     AdminUserListView,
@@ -8,6 +9,7 @@ from payments.admin_views import (
     AdminDashboardAnalyticsView,
     AdminUserDetailAnalyticsView
 )
+from django.views.generic import TemplateView
 
 from reports.admin_views import AdminReportDataView, AdminReportExportView
 
@@ -52,3 +54,11 @@ urlpatterns = [
     # Unified Enterprise Admin Namespace (/api/v1/admin/...)
     path("api/v1/admin/", include(admin_urlpatterns)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+# Must be last – serves React's index.html for any unknown route
+urlpatterns += [
+    re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
+]
+
+    

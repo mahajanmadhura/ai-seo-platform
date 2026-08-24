@@ -14,6 +14,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
+FRONTEND_BUILD_DIR = BASE_DIR / 'frontend' / 'dist'
 
 # EMAIL / BREVO CONFIG (FINAL)
 
@@ -77,7 +78,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [FRONTEND_BUILD_DIR],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -171,6 +172,9 @@ CHANNEL_LAYERS = {
 # STATIC & WHITENOISE
 # ==================================
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    FRONTEND_BUILD_DIR / 'static',    # Vite puts assets in dist/static
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 try:
