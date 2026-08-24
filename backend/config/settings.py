@@ -8,13 +8,13 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / '.env')
 
-SECRET_KEY = 'django-insecure-change-this-in-production-123456789'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production-123456789')
 
-DEBUG = False
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
-FRONTEND_BUILD_DIR = BASE_DIR / 'frontend' / 'dist'
+FRONTEND_BUILD_DIR = BASE_DIR.parent / 'frontend' / 'dist'
 
 # EMAIL / BREVO CONFIG (FINAL)
 
@@ -145,7 +145,8 @@ REST_FRAMEWORK = {
     )
 }
 
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
+CELERY_BROKER_URL = REDIS_URL
 
 # Where Celery should store the results of the tasks once they are done
 CELERY_RESULT_BACKEND = 'django-db'
@@ -161,7 +162,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [REDIS_URL],
         },
     },
 }
@@ -172,9 +173,7 @@ CHANNEL_LAYERS = {
 # STATIC & WHITENOISE
 # ==================================
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [
-    FRONTEND_BUILD_DIR / 'static',    # Vite puts assets in dist/static
-]
+STATICFILES_DIRS = []
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 try:

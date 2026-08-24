@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.urls import re_path
 from django.conf.urls.static import static
 from payments.admin_views import (
     AdminUserListView,
@@ -9,7 +8,7 @@ from payments.admin_views import (
     AdminDashboardAnalyticsView,
     AdminUserDetailAnalyticsView
 )
-from django.views.generic import TemplateView
+from django.http import JsonResponse
 
 from reports.admin_views import AdminReportDataView, AdminReportExportView
 
@@ -33,6 +32,7 @@ admin_urlpatterns = [
 ]
 
 urlpatterns = [
+    path('', lambda request: JsonResponse({'status': 'ok'}), name='health-check'),
     # Top-Level Direct Export and Data Routers (Absolute Resolution Guarantee)
     path("api/v1/admin/reports/export/", AdminReportExportView.as_view(), name='top-admin-reports-export'),
     path("api/v1/admin/reports/data/", AdminReportDataView.as_view(), name='top-admin-reports-data'),
@@ -56,9 +56,3 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
-# Must be last – serves React's index.html for any unknown route
-urlpatterns += [
-    re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
-]
-
-    
